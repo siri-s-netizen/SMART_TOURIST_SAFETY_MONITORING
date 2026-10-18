@@ -1,0 +1,621 @@
+<!doctype html><html><head><meta charset='utf-8'><title>model_card_movement</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="model-card-movement-recognition-and-impact-fall-detection">Model card — movement recognition and impact (fall) detection</h1>
+<p><em>Generated 2026-10-17. Every number in this document was produced by the scripts in <code>ml/</code> and read
+back out of the JSON artefacts in <code>ml/outputs/har/</code>, not typed in by hand. Where a claim cannot be
+supported by the data, this card says so.</em></p>
+<hr />
+<h2 id="1-what-these-models-are">1. What these models are</h2>
+<p>The app has <strong>two supervised models</strong>, both shipped inside the APK and both evaluated on the phone:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Model</th>
+<th>Question it answers</th>
+<th>Labels come from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td><strong>Activity recognition</strong></td>
+<td>"Is this person walking, walking upstairs, walking downstairs, sitting, standing or lying down?"</td>
+<td>Real human labels — UCI HAR's own annotations</td>
+</tr>
+<tr>
+<td>B</td>
+<td><strong>Impact / fall-signature detector</strong></td>
+<td>"Does this window contain the acceleration signature of a hard impact followed by stillness?"</td>
+<td>Real recordings, with a <strong>synthesised impact injected</strong> to create the positive class</td>
+</tr>
+</tbody>
+</table>
+<p>Both are ordinary <strong>scikit-learn random forests</strong> exported to JSON and walked on the device by
+hand-written Kotlin. There is no TensorFlow, no TFLite, no PyTorch and no network call at inference
+time. This is a deliberate size and reproducibility choice, and §7 proves the Kotlin walker agrees
+with scikit-learn.</p>
+<h3 id="what-this-is-not">What this is not</h3>
+<ul>
+<li><strong>Not a medical device.</strong> It does not diagnose a fall, a syncope, a seizure or an injury.</li>
+<li><strong>Not a real-fall detector.</strong> UCI HAR contains no falls. Model B is trained on a <em>simulated</em> impact
+  signature and its metrics measure that simulation (§5).</li>
+<li><strong>Not a lot-of-data model.</strong> 30 subjects in a controlled lab protocol is small. §8 lists what that
+  costs.</li>
+</ul>
+<p>The app never raises a fall alert on the model's opinion alone — see §6.</p>
+<hr />
+<h2 id="2-data">2. Data</h2>
+<p><strong>Source:</strong> UCI HAR (Human Activity Recognition Using Smartphones), dataset id <code>uci-240</code>, registered
+in <code>DATASETS.pdf</code>. The GeoLife GPS trajectories in the same document are used by the separate
+trajectory-anomaly work, <strong>not</strong> by these models: GeoLife has no accelerometer or gyroscope channels,
+so it cannot train a movement model. Saying otherwise would be the easiest lie in this project.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows</td>
+<td>7352 train / <strong>2947 test</strong></td>
+</tr>
+<tr>
+<td>Window length</td>
+<td>128 samples @ 50 Hz = <strong>2.56 s</strong></td>
+</tr>
+<tr>
+<td>Raw channels per split</td>
+<td>9 (<code>total_acc_x/y/z</code>, <code>body_acc_x/y/z</code>, <code>body_gyro_x/y/z</code>)</td>
+</tr>
+<tr>
+<td>Feature vectors (561-dim)</td>
+<td>561 per window, names from the dataset's own <code>features.txt</code></td>
+</tr>
+<tr>
+<td>Train subjects</td>
+<td>21 — 1, 3, 5, 6, 7, 8, 11, 14, 15, 16, 17, 19, 21, 22, 23, 25, 26, 27, 28, 29, 30</td>
+</tr>
+<tr>
+<td>Test subjects</td>
+<td>9 — 2, 4, 9, 10, 12, 13, 18, 20, 24</td>
+</tr>
+<tr>
+<td>Subject overlap</td>
+<td><strong>none</strong> (<code>subject_overlap: []</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The split is the dataset's official one and it is <strong>subject-disjoint</strong>: no person appears in both
+sides. That is the only honest way to report accuracy here, because windows from one person's
+recording are highly correlated and a random window split would leak.</p>
+<p>Sanity checks recorded in <code>ml/outputs/har/clean/har_dataset_meta.json</code>:</p>
+<ul>
+<li><code>train_windows = 7352</code>, <code>test_windows = 2947</code>, <code>feature_count = 561</code>, <code>raw_window_length = 128</code></li>
+<li><code>raw_windows_match_features = true</code>, <code>feature_vectors_match_names = true</code></li>
+<li><code>train_non_finite = 0</code>, <code>test_non_finite = 0</code></li>
+<li><code>raw_gravity_sanity</code>: mean total-acceleration magnitude <strong>1.0323 g</strong> (train) / <strong>1.0328 g</strong> (test) —
+  a real measurement centring on gravity, not a constant or a fabrication</li>
+<li><code>body_gyro_train_rms = 0.4068</code>, <code>total_acc_x_train_min_max = [-0.4666, 2.1976]</code></li>
+</ul>
+<hr />
+<h2 id="3-the-24-features-the-app-actually-computes">3. The 24 features the app actually computes</h2>
+<p>The phone cannot compute all 561 UCI features in real time (they include FFT-derived energy bands and
+entropy terms). The app computes a <strong>24-feature, time-domain-only</strong> subset that mirrors
+<code>MotionFeatures.kt</code> exactly, in the same order. Accelerometer samples are converted to g by dividing
+by <code>9.80665 m/s²</code> so the units match the dataset.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Feature</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1–8</td>
+<td><code>acc_mag_mean</code>, <code>acc_mag_std</code>, <code>acc_mag_min</code>, <code>acc_mag_max</code>, <code>acc_mag_range</code>, <code>acc_mag_energy</code>, <code>acc_mag_peak_jerk</code>, <code>acc_mag_zcr</code></td>
+<td>statistics of the acceleration magnitude: level, spread, extremes, spread, mean-square, largest sample-to-sample jump, zero-crossing rate</td>
+</tr>
+<tr>
+<td>9–11</td>
+<td><code>acc_x_mean</code>, <code>acc_y_mean</code>, <code>acc_z_mean</code></td>
+<td>mean per-axis acceleration — the <strong>gravity direction</strong>, i.e. how the phone is held</td>
+</tr>
+<tr>
+<td>12–14</td>
+<td><code>acc_x_std</code>, <code>acc_y_std</code>, <code>acc_z_std</code></td>
+<td>per-axis movement intensity</td>
+</tr>
+<tr>
+<td>15–17</td>
+<td><code>acc_xy_corr</code>, <code>acc_xz_corr</code>, <code>acc_yz_corr</code></td>
+<td>inter-axis correlation</td>
+</tr>
+<tr>
+<td>18–21</td>
+<td><code>gyro_mag_mean</code>, <code>gyro_mag_std</code>, <code>gyro_mag_max</code>, <code>gyro_mag_energy</code></td>
+<td>rotation-rate magnitude statistics</td>
+</tr>
+<tr>
+<td>22–24</td>
+<td><code>gyro_x_std</code>, <code>gyro_y_std</code>, <code>gyro_z_std</code></td>
+<td>per-axis rotation intensity</td>
+</tr>
+</tbody>
+</table>
+<p>Adding features 9–11 (the gravity direction) is what made the on-device model work: for a phone that is
+merely <em>held</em> differently, the acceleration component (18) and the axis correlations (15–17) are almost unchanged,
+while the mean per-axis values move a lot. During development the same forest built on the 21 features
+without them scored <strong>0.7581</strong> against the shipped set's <strong>0.8351</strong>. That ablation was run while
+choosing the feature set and is recorded in <code>docs/progress_log.md</code>; it is not regenerated by
+<code>har_train.py</code>, so treat it as a development measurement rather than a shipped artefact.</p>
+<p>Why 24 is enough — measured, not asserted:</p>
+<table>
+<thead>
+<tr>
+<th>Features used</th>
+<th>1</th>
+<th>2</th>
+<th>5</th>
+<th>12</th>
+<th>20</th>
+<th>30</th>
+<th>50</th>
+<th>80</th>
+<th>120</th>
+<th>200</th>
+<th>561</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Accuracy</td>
+<td>0.397</td>
+<td>0.563</td>
+<td>0.612</td>
+<td>0.768</td>
+<td>0.804</td>
+<td>0.826</td>
+<td>0.874</td>
+<td>0.889</td>
+<td>0.907</td>
+<td>0.918</td>
+<td>0.925</td>
+</tr>
+</tbody>
+</table>
+<p>Past roughly 50 features the curve flattens; the 561-feature model buys <strong>+0.09</strong> accuracy for
+23× the computation. <code>fig_har_05_accuracy_vs_features.png</code> plots this.</p>
+<hr />
+<h2 id="4-model-a-activity-recognition-real-labels">4. Model A — activity recognition (real labels)</h2>
+<p><strong>Configuration:</strong> <code>RandomForestClassifier</code>, <code>n_estimators=32</code>, <code>max_depth=8</code>, 24 features, fixed
+<code>random_state</code>. Trained on 7352 windows from 21 subjects, evaluated once on 2947 windows from 9
+unseen subjects.</p>
+<h3 id="headline-metrics-held-out-subject-disjoint">Headline metrics (held-out, subject-disjoint)</h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Features</th>
+<th>Trees</th>
+<th>Accuracy</th>
+<th>Macro-F1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Report reference</td>
+<td>561</td>
+<td>300</td>
+<td><strong>0.9287</strong></td>
+<td><strong>0.9271</strong></td>
+</tr>
+<tr>
+<td><strong>On-device (shipped)</strong></td>
+<td><strong>24</strong></td>
+<td><strong>32</strong></td>
+<td><strong>0.8351</strong></td>
+<td><strong>0.8333</strong></td>
+</tr>
+<tr>
+<td>Single decision tree (baseline)</td>
+<td>24</td>
+<td>1</td>
+<td>0.7967</td>
+<td>0.7943</td>
+</tr>
+</tbody>
+</table>
+<p>The shipped model is 0.0936 behind the 561-feature reference and 0.0384 ahead of a single tree. Both
+comparisons are reported because either one alone is misleading.</p>
+<h3 id="per-class-results-shipped-24-feature-model">Per-class results — shipped 24-feature model</h3>
+<table>
+<thead>
+<tr>
+<th>Activity</th>
+<th>Precision</th>
+<th>Recall</th>
+<th>F1</th>
+<th>Support</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WALKING</td>
+<td>0.7363</td>
+<td>0.8669</td>
+<td>0.7963</td>
+<td>496</td>
+</tr>
+<tr>
+<td>WALKING_UPSTAIRS</td>
+<td>0.7380</td>
+<td>0.7176</td>
+<td>0.7277</td>
+<td>471</td>
+</tr>
+<tr>
+<td>WALKING_DOWNSTAIRS</td>
+<td>0.9507</td>
+<td>0.7810</td>
+<td>0.8575</td>
+<td>420</td>
+</tr>
+<tr>
+<td>SITTING</td>
+<td>0.7996</td>
+<td>0.8045</td>
+<td>0.8020</td>
+<td>491</td>
+</tr>
+<tr>
+<td>STANDING</td>
+<td>0.8185</td>
+<td>0.8139</td>
+<td>0.8162</td>
+<td>532</td>
+</tr>
+<tr>
+<td>LAYING</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>537</td>
+</tr>
+<tr>
+<td><strong>Macro average</strong></td>
+<td><strong>0.8405</strong></td>
+<td><strong>0.8307</strong></td>
+<td><strong>0.8333</strong></td>
+<td>2947</td>
+</tr>
+</tbody>
+</table>
+<p>Where it fails, and why it does not matter much for this app: the three walking variants are
+confused with each other (upstairs recall 0.7176, and WALKING's precision is only 0.7363 because
+downstairs windows are called walking). <code>ActivityKind.isAmbulating</code> groups all three, and every
+decision the app makes from activity — "is this person moving?" — uses that grouping. The
+walking-versus-walking distinction is the least reliable output and also the least used.</p>
+<p><code>LAYING</code> is perfect on this split. That is a genuine property of the data (lying down is
+kinematically unmistakable) but it is <em>one</em> held-out fold of <em>thirty</em> subjects, and §8 says what
+that is worth.</p>
+<h3 id="figures-real-from-the-training-run">Figures (real, from the training run)</h3>
+<p>Confusion matrix, shipped 24-feature model (rows = true, columns = predicted):</p>
+<p><img alt="Confusion matrix, on-device 24-feature activity model" src="../ml/outputs/har/train/fig_har_03_confusion_deployable.png" /></p>
+<p>Confusion matrix, 561-feature reference model:</p>
+<p><img alt="Confusion matrix, 561-feature reference activity model" src="../ml/outputs/har/train/fig_har_02_confusion_561.png" /></p>
+<p>Accuracy versus number of features:</p>
+<p><img alt="Accuracy vs number of features" src="../ml/outputs/har/train/fig_har_05_accuracy_vs_features.png" /></p>
+<p>Per-class balance and forest feature importance:</p>
+<p><img alt="Class balance" src="../ml/outputs/har/train/fig_har_01_class_balance.png" /></p>
+<p><img alt="Feature importance" src="../ml/outputs/har/train/fig_har_04_feature_importance.png" /></p>
+<hr />
+<h2 id="5-model-b-impact-fall-signature-detector-synthesised-positives">5. Model B — impact / fall-signature detector (<strong>synthesised positives</strong>)</h2>
+<p>This is the part of the project most likely to be misread, so it is stated plainly and first.</p>
+<blockquote>
+<p><strong>UCI HAR contains no falls.</strong> There is no fall class, no "impact" annotation and no subject who
+fell. So the positive class was <strong>manufactured</strong>: a fall-like acceleration transient (a short
+free-fall dip, an impact spike of several g, and the stillness that follows) was injected into real
+recorded windows from the held-out subjects. The negative class is those same recordings untouched.</p>
+<p>Therefore the metrics below measure <strong>how well the detector finds the impact signature that was
+injected</strong>. They are not, and must not be reported as, clinical fall-detection performance.</p>
+</blockquote>
+<p><strong>Configuration:</strong> <code>RandomForestClassifier</code>, <code>n_estimators=40</code>, same 24 features, binary
+<code>NO_FALL</code> / <code>FALL</code>.</p>
+<p><strong>Split:</strong> subject-disjoint, and disjoint from nothing else — the test subjects are
+2, 4, 9, 10, 12, 13, 18, 20, 24; the detector trains on the other 21.</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Test windows</td>
+<td>1848 (924 positive, 924 negative)</td>
+</tr>
+<tr>
+<td>ROC-AUC</td>
+<td><strong>0.9999</strong></td>
+</tr>
+<tr>
+<td>Average precision</td>
+<td><strong>0.9999</strong></td>
+</tr>
+<tr>
+<td>F1 @ 0.5</td>
+<td><strong>0.9962</strong></td>
+</tr>
+<tr>
+<td>Precision @ 0.5</td>
+<td>0.9957</td>
+</tr>
+<tr>
+<td>Recall @ 0.5</td>
+<td>0.9968</td>
+</tr>
+<tr>
+<td><strong>Shuffled-label control (ROC-AUC)</strong></td>
+<td><strong>0.5198</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The last row is the one that gives the others meaning. Training the identical pipeline on the same
+features with the labels randomly permuted collapses ROC-AUC to 0.5198 — indistinguishable from
+chance. So the near-perfect score above is the detector genuinely finding the injected signature in
+real held-out subjects' recordings, not an artefact of leakage, duplicated windows, or a feature that
+secretly encodes the label.</p>
+<p>That is still a much easier problem than real fall detection, and it is easy to see why: an injected
+impact is a large, stereotyped, high-signal transient, and the synthetic positives share a generator.
+A real fall is messier, sometimes gentle, and often looks like sitting down quickly.</p>
+<p><strong>Upgrade path, and it is deliberately named rather than implied:</strong> SisFall, UniMiB SHAR and MobiFall
+are public datasets that contain genuine falls from real volunteers. Retraining on one of those is the
+single change that would turn these numbers into a fall-detection claim. It has not been done here.</p>
+<p>Detector ROC curve, confusion matrix and an example of the injected signal:</p>
+<p><img alt="Detector ROC curve" src="../ml/outputs/har/fall/fig_har_fall_01_roc.png" /></p>
+<p><img alt="Detector confusion matrix" src="../ml/outputs/har/fall/fig_har_fall_02_confusion.png" /></p>
+<p><img alt="Example of the injected impact signature" src="../ml/outputs/har/fall/fig_har_fall_03_signal.png" /></p>
+<hr />
+<h2 id="6-how-a-fall-is-decided-on-the-phone">6. How a fall is decided on the phone</h2>
+<p>The model's score is <strong>one of three gates</strong>, and the app only ever <em>suspends</em> a fall when all three
+agree. The thresholds live in <code>FallPolicy</code> and are published rather than buried:</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Threshold</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Impact magnitude</td>
+<td>≥ <strong>2.0 g</strong></td>
+<td>a hard fall lands roughly 2–5 g at the waist; below this it is a stumble, a dropped phone or a bang against a rail</td>
+</tr>
+<tr>
+<td>Model score</td>
+<td>≥ <strong>0.55</strong></td>
+<td>the window looks like the impact signature the detector was trained on</td>
+</tr>
+<tr>
+<td>Stillness after the impact</td>
+<td>std ≤ <strong>0.12 g</strong></td>
+<td>after a real fall the body stops; the app measures this from the <em>last</em> sample at or above the impact threshold, not from the whole plateau</td>
+</tr>
+<tr>
+<td>Cooldown</td>
+<td><strong>15 s</strong></td>
+<td>windows overlap by design, so one fall would otherwise raise five alerts</td>
+</tr>
+<tr>
+<td>Tail fraction</td>
+<td><strong>0.25</strong></td>
+<td>if the peak lands in the last quarter of the window there is not enough signal left to judge stillness, so that gate is <strong>skipped</strong> rather than failed</td>
+</tr>
+</tbody>
+</table>
+<p>Consequences that are visible in the UI: the face shows the probability <em>and</em> the threshold, the peak
+g, the stillness value and its threshold, and it says "suspected". A single high model score with no
+physical impact never raises anything.</p>
+<hr />
+<h2 id="7-on-device-inference-and-the-proof-it-is-correct">7. On-device inference, and the proof it is correct</h2>
+<h3 id="export-contract">Export contract</h3>
+<p>Each tree is exported as five flat parallel arrays (<code>feature</code>, <code>threshold</code>, <code>left</code>, <code>right</code>, <code>value</code>).
+Walking a tree is: <strong>go left when <code>value &lt;= threshold</code></strong>, otherwise right; a node with
+<code>left[node] == -1</code> is a leaf. Each tree's leaf counts are normalised to a distribution, then the
+forest <strong>averages</strong> those distributions — which reproduces scikit-learn's <code>predict_proba</code>.</p>
+<p>A bug worth recording, because it would have shipped silently: scikit-learn's <code>tree_.value</code> holds
+<strong>class fractions, not counts</strong>. The first exporter wrote <code>np.rint(tree.value)</code>, which rounds every
+node to 0s and 1s and collapses every leaf into a one-hot vector. The model would have loaded, run and
+answered — just wrongly. It is fixed by exporting
+<code>np.rint(tree.value * tree.weighted_n_node_samples)</code>, and
+<code>ml/tests/test_har_models.py::test_exported_values_are_integer_counts_not_rounded_fractions</code> now
+fails if the root node of any tree holds implausibly few samples.</p>
+<h3 id="size">Size</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Bytes</th>
+<th>Ships in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>har_activity_model.json</code></td>
+<td>268 734 (262.4 KB)</td>
+<td><code>app/src/main/assets/</code></td>
+</tr>
+<tr>
+<td><code>har_fall_model.json</code></td>
+<td>59 679 (58.3 KB)</td>
+<td><code>app/src/main/assets/</code></td>
+</tr>
+<tr>
+<td><code>har_activity_model_spec.json</code></td>
+<td>3 479</td>
+<td><code>app/src/main/assets/</code> (documentation asset)</td>
+</tr>
+</tbody>
+</table>
+<p>Both models together are under 330 KB, which is the reason a hand-written walker was chosen over a
+runtime.</p>
+<h3 id="verification-that-the-export-is-faithful">Verification that the export is faithful</h3>
+<p><code>ml/har_verify_export.py</code> re-implements the walker in Python and compares it against scikit-learn on
+real windows:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Max feature error</th>
+<th>Max probability error</th>
+<th>Argmax mismatches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Activity</td>
+<td>5.458e-07</td>
+<td>4.970e-07</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Impact/fall</td>
+<td>6.342e-07</td>
+<td>4.736e-07</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>The Kotlin walker is verified independently of Python by <code>ForestReferenceTest</code>, which replays
+12 real windows per model — with scikit-learn's own probability vectors baked into
+<code>app/src/test/resources/har_*_reference_cases.json</code> — through the shipped JSON assets on the JVM and
+asserts the same class probabilities and argmax. So the same model is checked on both sides of the
+wire, and <code>ml/tests/test_har_models.py</code> additionally asserts that the files in <code>app/src/main/assets</code>
+are byte-identical to the verified training output, so "I retrained but forgot to copy it" cannot
+pass quietly.</p>
+<hr />
+<h2 id="8-limitations">8. Limitations</h2>
+<ol>
+<li><strong>No real falls were used.</strong> §5. The strongest limitation in this card.</li>
+<li><strong>Lab data.</strong> UCI HAR is 30 volunteers aged 19–48 performing scripted activities with a waist-mounted
+   phone. Real tourists carry the phone wherever, wear bags, and stop to take photos.</li>
+<li><strong>6 activities, no fall class.</strong> The activity model's label set is exactly the dataset's; the app
+   does not invent a "falling" activity.</li>
+<li><strong>0.8351 accuracy means roughly one window in six is misclassified.</strong> The UI therefore shows the
+   activity <em>with its confidence</em> and never acts on activity alone.</li>
+<li><strong>Phone placement matters.</strong> Features 9–11 encode the gravity direction, so a phone in a pocket
+   versus held flat gives different means; the model was trained on waist-mounted data.</li>
+<li><strong>Nothing here has been validated on a real device by this project.</strong> The build environment for
+   this work had no emulator and no attached phone (<code>adb devices</code> was empty), so the sensor pipeline
+   is compile-checked and JVM-tested against recorded windows, but the instrumented cases that would
+   prove it on hardware are recorded as <strong>NOT EXECUTED</strong> in <code>docs/test_report.md</code>. That is a gap
+   in evidence, not a passed test.</li>
+<li><strong>The approach-risk score shown when nearing a restricted zone is <em>not</em> a model.</strong> It is a
+   published weighted checklist (<code>ApproachRiskModel</code>) combining zone severity, the tourist's own
+   recorded crossings, distance, time of day and the live movement state. It is deliberately not
+   dressed up as a learned danger probability; see §9 of <code>docs/final_project_report.md</code>.</li>
+</ol>
+<hr />
+<h2 id="9-reproducing-these-numbers">9. Reproducing these numbers</h2>
+<pre><code class="language-powershell">cd D:\TouristSafetyMonitoring-src
+python ml\har_preprocess.py     # extract/verify UCI HAR -&gt; ml\outputs\har\clean\
+python ml\har_train.py          # activity model, metrics, figures -&gt; ml\outputs\har\train\
+python ml\har_fall.py           # injected-impact detector      -&gt; ml\outputs\har\fall\
+python ml\har_verify_export.py  # exported JSON vs scikit-learn: expect ALL PASS
+python -m pytest ml\tests -q    # 86 tests, includes the artefact contract tests
+</code></pre>
+<p>Then copy the artefacts into the app and run the Kotlin side:</p>
+<pre><code class="language-powershell">powershell -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:testDebugUnitTest&quot;
+</code></pre>
+<p>Training is seeded, so the metrics above reproduce exactly; re-running <code>har_train.py</code> regenerates
+files byte-identical to the shipped ones.</p>
+<hr />
+<h2 id="10-files">10. Files</h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml/har_preprocess.py</code></td>
+<td>dataset extraction, integrity checks, subject split</td>
+</tr>
+<tr>
+<td><code>ml/har_train.py</code></td>
+<td>activity model, per-class report, figures, model + reference-case export</td>
+</tr>
+<tr>
+<td><code>ml/har_fall.py</code></td>
+<td>injected-impact generation, detector, shuffled-label control</td>
+</tr>
+<tr>
+<td><code>ml/har_verify_export.py</code></td>
+<td>JSON-vs-scikit-learn agreement check</td>
+</tr>
+<tr>
+<td><code>ml/tests/test_har_models.py</code></td>
+<td>pytest contract tests for the artefacts above</td>
+</tr>
+<tr>
+<td><code>ml/outputs/har/clean/</code></td>
+<td>dataset metadata, class balance, subject split</td>
+</tr>
+<tr>
+<td><code>ml/outputs/har/train/</code></td>
+<td>activity reports, metrics CSV, figures, model JSON, spec</td>
+</tr>
+<tr>
+<td><code>ml/outputs/har/fall/</code></td>
+<td>detector report, ROC/confusion/signal figures, model JSON</td>
+</tr>
+<tr>
+<td><code>app/src/main/assets/har_activity_model.json</code></td>
+<td>shipped activity forest</td>
+</tr>
+<tr>
+<td><code>app/src/main/assets/har_fall_model.json</code></td>
+<td>shipped impact detector</td>
+</tr>
+<tr>
+<td><code>app/src/main/java/com/touristsafety/app/motion/MotionFeatures.kt</code></td>
+<td>the 24-feature implementation</td>
+</tr>
+<tr>
+<td><code>app/src/main/java/com/touristsafety/app/motion/DecisionForest.kt</code></td>
+<td>the JSON forest walker</td>
+</tr>
+<tr>
+<td><code>app/src/main/java/com/touristsafety/app/motion/MovementAnalyzer.kt</code></td>
+<td>window management + the three fall gates</td>
+</tr>
+<tr>
+<td><code>app/src/test/java/com/touristsafety/app/motion/ForestReferenceTest.kt</code></td>
+<td>Kotlin-vs-scikit-learn agreement</td>
+</tr>
+</tbody>
+</table></body></html>

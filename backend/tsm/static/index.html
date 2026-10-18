@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tourist Safety — Authority Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- Sign-in. The token is kept in sessionStorage, never in a cookie, so closing the tab signs out. -->
+<section id="signin" class="signin">
+  <form id="signin-form" autocomplete="off">
+    <h1>Authority sign-in</h1>
+    <p class="muted">
+      Tourists sign in on the phone with the same service. This page is the operator view.
+    </p>
+    <label for="operator-id">Operator id</label>
+    <input id="operator-id" name="operatorId" required placeholder="A-01">
+    <label for="operator-password">Password</label>
+    <input id="operator-password" name="password" type="password" required>
+    <button type="submit">Sign in</button>
+    <p id="signin-error" class="error" role="alert" hidden></p>
+    <p class="muted small">
+      The first start of the server generates these credentials and prints them once. They are also
+      written to <code>backend/var/DEV_CREDENTIALS.txt</code>.
+    </p>
+  </form>
+</section>
+
+<main id="dashboard" hidden>
+  <header>
+    <div>
+      <h1>Tourist Safety — Authority Dashboard</h1>
+      <p class="muted small">
+        Signed in as <strong id="whoami">—</strong> ·
+        server time <span id="server-time">—</span> ·
+        <span id="feed-state" class="pill pill-ok">live</span>
+      </p>
+    </div>
+    <div class="actions">
+      <label class="toggle"><input type="checkbox" id="auto-refresh" checked> auto-refresh (5s)</label>
+      <button id="refresh" type="button">Refresh now</button>
+      <button id="signout" type="button" class="ghost">Sign out</button>
+    </div>
+  </header>
+
+  <p id="banner" class="banner" role="status" hidden></p>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="panel">
+    <h2>SOS queue <span class="muted small">— newest first, unacknowledged on top</span></h2>
+    <table id="sos-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Tourist</th><th>Raised</th><th>Position</th><th>Source</th>
+          <th>Status</th><th>Acknowledged by</th><th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="empty" id="sos-empty" hidden>No SOS has been received.</p>
+  </section>
+
+  <section class="panel">
+    <h2>
+      Registered Tourists
+      <span class="muted small">
+        — every account on this service, newest first. Registration, tracking and safety are
+        <strong>separate columns</strong>: a tourist who registered a moment ago appears here with a
+        registration date and no location yet.
+      </span>
+    </h2>
+    <table id="tourists-table">
+      <thead>
+        <tr>
+          <th>Tourist ID</th><th>Name</th><th>Phone</th><th>Registered</th><th>Registration</th>
+          <th>Tracking</th><th>Latest position</th><th>Open SOS</th><th>Risk (model)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="empty" id="tourists-empty" hidden>No tourists are registered yet.</p>
+  </section>
+
+  <section class="panel">
+    <h2>
+      Restricted zones
+      <span class="muted small">
+        — the polygons a tourist's phone is warned by. Only this signed-in officer view can create
+        or change one; a phone may read the <em>active</em> set and nothing else. Pausing or
+        archiving a zone stops phones evaluating it, and an archived zone is kept for the record.
+      </span>
+    </h2>
+
+    <details class="zone-form">
+      <summary>Publish a new zone</summary>
+      <form id="zone-form" autocomplete="off">
+        <div class="grid">
+          <label for="zone-name">Name
+            <input id="zone-name" required maxlength="120" placeholder="Old quarry">
+          </label>
+          <label for="zone-type">Type
+            <select id="zone-type">
+              <option value="RESTRICTED" selected>Restricted</option>
+              <option value="DANGEROUS">Dangerous</option>
+              <option value="SAFE">Safe (informational)</option>
+            </select>
+          </label>
+          <label for="zone-status">Status
+            <select id="zone-status">
+              <option value="ACTIVE" selected>Active — published to phones</option>
+              <option value="INACTIVE">Draft — not evaluated</option>
+            </select>
+          </label>
+        </div>
+        <label for="zone-description">Description
+          <input id="zone-description" maxlength="1000" placeholder="Steep sides, no fencing.">
+        </label>
+        <label for="zone-vertices">
+          Polygon vertices — one <code>latitude, longitude</code> per line, in order (at least three).
+          The closing edge is added automatically.
+        </label>
+        <textarea id="zone-vertices" rows="6" spellcheck="false"
+          placeholder="12.9716, 77.5946&#10;12.9734, 77.5946&#10;12.9734, 77.5974&#10;12.9716, 77.5974"></textarea>
+        <p id="zone-preview" class="muted small">No vertices parsed yet.</p>
+        <p id="zone-error" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button type="submit" id="zone-submit">Publish zone</button>
+          <button type="button" class="ghost" id="zone-use-here">Centre a square on the first located tourist</button>
+        </div>
+      </form>
+    </details>
+
+    <table id="zones-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Name</th><th>Type</th><th>Status</th><th>Vertices</th><th>Rev</th>
+          <th>Updated</th><th>Created by</th><th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="empty" id="zones-empty" hidden>No zone has been published.</p>
+  </section>
+
+  <section class="panel">
+    <h2>
+      Future-risk predictions
+      <span class="muted small">
+        — forecasts from a trained model on the tourist's own phone. These are <strong>predictions,
+        not incidents</strong> and not SOS. They never raise an SOS by themselves.
+      </span>
+    </h2>
+    <table id="risk-table">
+      <thead>
+        <tr>
+          <th>Predicted at</th><th>Tourist</th><th>Band</th><th>Probability</th>
+          <th>Horizon</th><th>Model</th><th>Data quality</th><th>Contributing factors</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="empty" id="risk-empty" hidden>No prediction has been shared yet.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Recent event log</h2>
+    <div class="actions">
+      <label for="kind-filter">Kind</label>
+      <select id="kind-filter">
+        <option value="">all</option>
+        <option value="SOS">SOS</option>
+        <option value="ZONE_ALERT">Zone alert</option>
+        <option value="POSITION">Position</option>
+        <option value="CONTACTS">Contacts</option>
+        <option value="RISK">Risk prediction</option>
+      </select>
+    </div>
+    <table id="events-table">
+      <thead>
+        <tr>
+          <th>Received</th><th>Tourist</th><th>Kind</th><th>Detail</th><th>Position</th><th>Source</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="empty" id="events-empty" hidden>Nothing received yet.</p>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

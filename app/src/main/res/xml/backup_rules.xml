@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy (pre-API 31) backup configuration.
+  Geo-fences, GPS history and alert history must survive a device restore, so the Room
+  database is explicitly included in cloud backups.
+-->
+<full-backup-content>
+    <include
+        domain="database"
+        path="." />
+</full-backup-content>

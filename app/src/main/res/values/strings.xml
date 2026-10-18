@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tourist Safety</string>
+
+    <!-- Notification channels -->
+    <string name="channel_tracking_name">Location tracking</string>
+    <string name="channel_tracking_desc">Ongoing notification shown while GPS tracking runs.</string>
+    <string name="channel_alerts_name">Geo-fence alerts</string>
+    <string name="channel_alerts_desc">Alerts when you enter or leave a monitored zone.</string>
+
+    <!-- Tracking service -->
+    <string name="tracking_service_title">Tourist Safety is tracking your location</string>
+    <string name="tracking_service_text">GPS tracking active — geo-fence checks run on this device.</string>
+</resources>

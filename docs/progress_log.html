@@ -1,0 +1,1759 @@
+<!doctype html><html><head><meta charset='utf-8'><title>progress_log</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="progress-log-tourist-safety-monitoring-system">Progress Log — Tourist Safety Monitoring System</h1>
+<p>Working directory: <code>D:\TouristSafetyMonitoring-src</code> (the project was renamed from
+<code>D:\TouristSafetyMonitoring</code>; nothing was deleted).</p>
+<p>Status legend: <strong>DONE</strong> = implemented and verified by a run · <strong>PARTIAL</strong> = implemented, not fully
+verified · <strong>BLOCKED</strong> = needs a device / key / network · <strong>TODO</strong> = not started.</p>
+<hr />
+<h2 id="0-environment-verified">0. Environment (verified)</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JDK</td>
+<td><code>D:\AndroidTools\jdk-21</code> (Temurin 21)</td>
+</tr>
+<tr>
+<td>Gradle</td>
+<td><code>D:\AndroidTools\gradle-8.11.1</code> + committed wrapper 8.11.1</td>
+</tr>
+<tr>
+<td>Android SDK</td>
+<td><code>D:\AndroidTools\Sdk</code> (platform 35, build-tools 35/34, platform-tools)</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>3.11.9 (<code>C:\Users\DELL\AppData\Local\Programs\Python\Python311</code>)</td>
+</tr>
+<tr>
+<td>Python libs</td>
+<td>numpy 2.4.4, pandas 3.0.6, scikit-learn 1.8.0, matplotlib 3.11.2</td>
+</tr>
+<tr>
+<td>Git</td>
+<td><code>C:\Program Files\Git\cmd\git.exe</code> (project is <strong>not</strong> a git repo)</td>
+</tr>
+<tr>
+<td>Device / emulator</td>
+<td><strong>none</strong> — instrumented tests and on-device rendering cannot be executed</td>
+</tr>
+</tbody>
+</table>
+<p>Baseline at the start of this pass: <code>:app:testDebugUnitTest</code> = <strong>130 tests, 0 failures</strong>;
+<code>:app:assembleDebug</code> = success; instrumented suite compile-checked only.</p>
+<hr />
+<h2 id="1-inspection-findings-checklist">1. Inspection findings (checklist)</h2>
+<h3 id="11-map-create-geo-fence-screen-is-blank">1.1 Map / Create Geo-Fence screen is blank</h3>
+<ul>
+<li><strong>Cause (confirmed in code):</strong> <code>ui/components/SafetyMap.kt</code> gates the whole map on
+  <code>mapsApiKeyConfigured</code>. With no key it renders a notice <strong>instead of a map</strong>, so taps never reach
+  <code>onMapClick</code>, no vertices can be added, Close Ring stays disabled, zones cannot be saved.</li>
+<li><strong>Fix:</strong> key-less OpenStreetMap fallback so drawing/saving works with no Google key, keeping
+  Google Maps when a key is present.</li>
+</ul>
+<h3 id="12-home-shows-tracking-active-but-background-service-not-running">1.2 Home shows "Tracking Active" but "Background service Not running"</h3>
+<ul>
+<li><strong>Cause:</strong> <code>HomeScreen.kt</code> printed the <em>intent</em> flag <code>snapshot.backgroundTracking</code>, not whether
+  <code>LocationTrackingService</code> was actually alive.</li>
+<li><strong>Fix:</strong> track the real foreground-service lifecycle and surface
+  RUNNING / PAUSED(!permission) / OFF.</li>
+</ul>
+<h3 id="13-no-delivery-path-for-alertssos-no-backend-in-the-repo">1.3 No delivery path for alerts/SOS; no backend in the repo</h3>
+<ul>
+<li><strong>Fix:</strong> durable <strong>offline outbox</strong> + pluggable <code>SyncTransport</code>, with an honest <code>NoBackendTransport</code>
+  that keeps events queued (never fakes delivery).</li>
+</ul>
+<hr />
+<h2 id="2-work-performed-final-status">2. Work performed (final status)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Item</th>
+<th>Status</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Inspection + this log</td>
+<td>DONE</td>
+<td>this file</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Key-less OpenStreetMap fallback map</td>
+<td>DONE (JVM-verified) / PARTIAL (on-device render)</td>
+<td><code>MercatorProjectionTest</code> 11, <code>TilePolicyTest</code> 14, <code>TileDiskCacheTest</code> 6 pass; on-device tile render NOT EXECUTED</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Background-service true state</td>
+<td>DONE</td>
+<td><code>TrackingController</code>, <code>LocationTrackingService</code>, <code>HomeViewModel</code>, <code>HomeScreen</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Simulated smartwatch + SOS</td>
+<td>DONE (logic) / PARTIAL (haptics)</td>
+<td><code>WatchControllerTest</code> 6 pass; vibration NOT EXECUTED</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Offline outbox / sync transport</td>
+<td>DONE</td>
+<td><code>OutboxQueueTest</code> 8, <code>OutboxPayloadsTest</code> 5 pass</td>
+</tr>
+<tr>
+<td>6</td>
+<td>ML / EDA pipeline on real GeoLife</td>
+<td>DONE</td>
+<td>21 pytest pass; real metrics in <code>ml/outputs/eval/</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Automated tests for the above</td>
+<td>DONE</td>
+<td>196 JVM + 21 ML pass; instrumented compile-only</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Technical report</td>
+<td>DONE</td>
+<td><code>docs/test_report.md</code>, <code>docs/final_project_report.md</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Map centring + live follow + multiple sample areas</td>
+<td>DONE (logic) / PARTIAL (UI wiring)</td>
+<td><code>SampleAreasTest</code> 6 pass; button/follow NOT EXECUTED on a device</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Offline tile disk cache + provider fail-over + diagnostics</td>
+<td>DONE (policy/IO) / PARTIAL (on-device)</td>
+<td><code>TilePolicyTest</code> 18, <code>TileDiskCacheTest</code> 6 pass; real offline render NOT EXECUTED</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Blue "you are here" marker, closer zoom, typed corners, crash log, tile-memory bound</td>
+<td>DONE (logic) / PARTIAL (rendering)</td>
+<td><code>GeoFenceEditorViewModelTest</code> 14, <code>TilePolicyTest</code> 18 pass; marker/zoom/dialog NOT EXECUTED on a device (§10)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="additional-details">Additional details</h3>
+<ul>
+<li>Database: <code>AppDatabase.VERSION</code> 1 → 2 with additive <code>DatabaseMigrations.MIGRATION_1_2</code> that creates
+  <code>outbox_events</code>; no destructive migration; SQL verified against the generated <code>2.json</code>.</li>
+<li>ML dataset: the real <strong>GeoLife GPS Trajectories 1.3</strong> archive (313,164,406 bytes) was downloaded and
+  unzipped here — no synthetic substitution. Measured 18,670 <code>.plt</code> files, 24,876,978 rows, 0
+  malformed. The detector is <strong>unsupervised</strong> (IsolationForest); its output is a <em>movement anomaly
+  score</em>, never a danger probability. A separate SYNTHETIC fixture exists only for tests and is
+  loudly labelled.</li>
+</ul>
+<hr />
+<h2 id="3-verification-steps-as-executed">3. Verification steps (as executed)</h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Command (from <code>D:\TouristSafetyMonitoring-src</code>)</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unit tests (baseline)</td>
+<td><code>…\build.ps1 ":app:testDebugUnitTest"</code></td>
+<td><strong>130</strong> passed / 0 failed</td>
+</tr>
+<tr>
+<td>Unit tests (final)</td>
+<td><code>…\build.ps1 ":app:testDebugUnitTest"</code></td>
+<td><strong>196</strong> passed / 0 failed / 0 skipped</td>
+</tr>
+<tr>
+<td>Instrumented compile-check</td>
+<td><code>…\build.ps1 ":app:compileDebugAndroidTestKotlin"</code></td>
+<td>BUILD SUCCESSFUL (not run)</td>
+</tr>
+<tr>
+<td>Debug APK</td>
+<td><code>…\build.ps1 ":app:assembleDebug"</code></td>
+<td>BUILD SUCCESSFUL — 18.32 MB</td>
+</tr>
+<tr>
+<td>ML tests</td>
+<td><code>python -m pytest tests -q</code> (in <code>ml\</code>)</td>
+<td><strong>21</strong> passed</td>
+</tr>
+<tr>
+<td>ML pipeline</td>
+<td><code>…\run_all.ps1</code></td>
+<td>preprocess / eda / train / evaluate completed on real data</td>
+</tr>
+</tbody>
+</table>
+<h3 id="real-ml-numbers-from-mloutputs">Real ML numbers (from <code>ml/outputs/</code>)</h3>
+<ul>
+<li>Preprocess: 18,670 trajectories, 24,876,978 rows, 0 malformed; cleaned sample 1,429,740 points.</li>
+<li>Train: 1,060,493 train / 369,247 test points (900 / 300 trajectories, grouped by <code>traj_uid</code>, 0 overlap).</li>
+<li>Evaluate: injection ROC-AUC <strong>0.8922</strong>, average precision <strong>0.6763</strong>, shuffled control <strong>0.5007</strong>.</li>
+</ul>
+<hr />
+<h2 id="4-not-executed-blocked-declared-honestly">4. Not executed (BLOCKED) — declared honestly</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DatabaseMigrationTest</code>, <code>AppDatabaseInstrumentedTest</code>, <code>StatusBannerInstrumentedTest</code></td>
+<td>no device/emulator (compile-checked only)</td>
+</tr>
+<tr>
+<td>OpenStreetMap tile rendering on screen</td>
+<td>no device/emulator or observable rendering</td>
+</tr>
+<tr>
+<td>Smartwatch vibration / SOS haptic pattern</td>
+<td>emulators have no vibrator; needs a physical phone</td>
+</tr>
+</tbody>
+</table>
+<p>No other item is blocked: <strong>PDF exports were produced</strong> for every document (and <code>README</code>). Pipeline:
+Markdown → HTML (<code>python-markdown</code>) → PDF (headless Microsoft Edge <code>--print-to-pdf</code>). The <code>.html</code> and
+<code>.pdf</code> sit beside each <code>.md</code> in <code>docs\</code> (plus <code>README.html</code>).</p>
+<hr />
+<h2 id="5-known-limitations">5. Known limitations</h2>
+<ul>
+<li>This is a <strong>monitoring aid</strong>, not an emergency service; it does <strong>not</strong> contact anyone automatically.</li>
+<li><em>(Superseded — see §12.)</em> At the time of writing, no backend existed, so queued events stayed
+  "Queued (offline)". A backend now ships in the repository and the app delivers to it; with no address
+  configured the honest queued behaviour remains.</li>
+<li>ML has no real danger labels; only injection-based validation is meaningful.</li>
+<li>GeoLife is dominated by a few Beijing users, so "normal" is region/person-specific.</li>
+</ul>
+<hr />
+<h2 id="6-follow-up-fixes-after-real-device-feedback-2026-10-16">6. Follow-up fixes after real-device feedback (2026-10-16)</h2>
+<p>The user installed the APK on a real phone and reported that the OpenStreetMap fallback looked like a
+blank light-blue slab and that real-time position was not visible.</p>
+<p><strong>Root cause (confirmed by reading the code):</strong> <code>GeoFenceEditorScreen</code> passed <strong>no location</strong> to
+<code>SafetyMapFill</code>. With no live fix, no draft vertex and no zone, <code>OfflineOsmMap</code> fell back to
+<code>GeoPoint(0.0, 0.0)</code> — <strong>Null Island, in the Atlantic Ocean</strong> — so the screen showed open-ocean tiles
+(flat blue with tile seams) and every tap landed in the sea. The Tracking screen could likewise stay
+pinned at <code>(0,0)</code> when the first fix had not yet arrived.</p>
+<p><strong>Fixes applied (Android main source):</strong></p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ui/components/OfflineOsmMap.kt</code></td>
+<td>Camera no longer defaults to <code>(0,0)</code>; prefers live fix → draft vertex → zone → <strong>device last-known location</strong> (<code>LocationManager</code>), else shows a "Finding your location" card. Added <strong>live follow mode</strong> (camera tracks the newest fix; a manual pan stops following; the locate FAB re-enables it), a <strong>breadcrumb trail</strong>, a <strong>scale bar</strong> + centre-coordinate readout, hardened tile fetching (<strong>two OSM mirror hosts</strong>, <code>Accept</code> header, 6 s timeouts, per-tile error capture) with an on-screen <strong>"Street map offline — Retry"</strong> affordance, and white corner halos on draft vertices.</td>
+</tr>
+<tr>
+<td><code>ui/components/SafetyMap.kt</code></td>
+<td>New <code>trail</code> parameter, passed through to both the Google and OSM paths, plus a <code>TrailOverlay</code> for the Google path.</td>
+</tr>
+<tr>
+<td><code>ui/screens/TrackingScreen.kt</code></td>
+<td>Passes the recent fixes (oldest-first) as the trail so movement is visible.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Verification:</strong> <code>:app:testDebugUnitTest</code> + <code>:app:assembleDebug</code> → BUILD SUCCESSFUL, <strong>160 tests, 0
+failures</strong>; APK rebuilt (18.29 MB, <code>D:\TouristSafetyMonitoring-src-debug.apk</code>). On-device tile
+rendering and the follow behaviour still require the user's phone and are <strong>not</strong> claimed as
+device-verified here.</p>
+<hr />
+<h2 id="7-second-round-of-real-device-feedback-real-google-map-multiple-areas-2026-10-16">7. Second round of real-device feedback: "real Google map" + multiple areas (2026-10-16)</h2>
+<p><strong>Feedback.</strong> The user asked for a <em>real Google map</em>, a restricted area shown as a polygon, and
+<strong>multiple</strong> areas, and pointed at the Microsoft Research <strong>GeoLife</strong> dataset page.</p>
+<p><strong>What was actually wrong.</strong> The Google path has always been in the app (<code>SafetyMap.kt</code> →
+<code>GoogleSafetyMap</code>) but needs an API key; none is configured, so the key-less map is used. More
+importantly, the <strong>Create</strong> screen hit the same null-island bug as the Tracking screen: it passed no
+location, so the camera sat at <code>(0, 0)</code>. Also, the Google camera was only set <strong>once</strong>, so it did not
+follow the user, which is why tracking looked static.</p>
+<p><strong>Changes (Android main source):</strong></p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ui/components/DeviceLocation.kt</code></td>
+<td><strong>New.</strong> <code>lastKnownDeviceLocation()</code> / <code>rememberDeviceLocation()</code> — the single, shared, permission-guarded read of the OS last-known fix. Keeps the map off null island with no GPS session and no database writes.</td>
+</tr>
+<tr>
+<td><code>ui/components/OfflineOsmMap.kt</code></td>
+<td>Now uses the shared helper (its private copy was deleted).</td>
+</tr>
+<tr>
+<td><code>ui/screens/GeoFenceEditorScreen.kt</code></td>
+<td>Reads the <strong>live</strong> tracking snapshot and falls back to the last-known device fix, then opens the camera on <code>state.centroid ?: here</code>. The live reading is also passed to the map so "you are here" shows while drawing. Fixes the blank/ocean Create screen for <strong>both</strong> the Google and OSM maps.</td>
+</tr>
+<tr>
+<td><code>ui/components/SafetyMap.kt</code></td>
+<td><strong>New</strong> <code>FollowLatestFix(cameraPositionState, point)</code> — animates the Google camera to the newest fix so the Tracking map behaves like a live tracker.</td>
+</tr>
+<tr>
+<td><code>ui/screens/TrackingScreen.kt</code></td>
+<td>Calls <code>FollowLatestFix</code> and adds a <strong>follow toggle</strong> (my-location FAB): tap to stop/start following.</td>
+</tr>
+<tr>
+<td><code>geofencing/SampleAreas.kt</code></td>
+<td><strong>New, pure.</strong> <code>SampleAreas.create(center)</code> builds three labelled sample zones (restricted / dangerous / safe), 140 m squares laid out in a row 340 m apart, longitude scaled by <code>cos(latitude)</code>.</td>
+</tr>
+<tr>
+<td><code>ui/viewmodel/ManageZonesViewModel.kt</code></td>
+<td><code>addSampleAreas(center)</code> persists <code>SampleAreas.create(center)</code>; <code>showMessage()</code> added.</td>
+</tr>
+<tr>
+<td><code>ui/screens/ManageZonesScreen.kt</code></td>
+<td><strong>New</strong> "Add 3 sample areas near me" button: uses the device fix, else the first existing zone's first vertex, else explains that location must be on.</td>
+</tr>
+<tr>
+<td><code>docs/google_maps_setup.md</code></td>
+<td><strong>New.</strong> How to get a free Maps SDK for Android key, where to paste it (<code>local.properties</code> / <code>-PMAPS_API_KEY</code>), how to rebuild, and how to read grey-tile failures.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Verification.</strong> <code>:app:testDebugUnitTest</code> + <code>:app:assembleDebug</code> → <strong>BUILD SUCCESSFUL, 166 tests, 0
+failures, 0 skipped</strong> (160 + 6 new <code>SampleAreasTest</code> cases, MAP-01…MAP-06). APK rebuilt: 18.29 MB,
+SHA-256 <code>3CCAEF4460865CF41160753F5B56CA946EEF489B4E210B39ED66E0C7831663BD</code>, copied to
+<code>D:\TouristSafetyMonitoring-src-debug.apk</code> and the Documents folder.</p>
+<p><strong>Still not device-verified:</strong> Google basemap rendering with a key, the on-screen centring, the follow
+toggle and the sample-areas button (INST-06…INST-08 in <code>docs/test_report.md</code>). The geometry behind the
+button <strong>is</strong> unit-tested; the UI wiring is not.</p>
+<p><strong>About the dataset.</strong> GeoLife is a <em>human-movement</em> dataset (18,670 <code>.plt</code> files, 24.9 M fixes,
+mostly Beijing). It powers the <strong>ML movement-anomaly module</strong> and the EDA report — see
+<code>docs/dataset_and_eda.md</code>. It is not a basemap and cannot make the map render; the basemap comes from
+Google Maps or OpenStreetMap tiles. If GeoLife-derived areas are wanted on the map later, the honest
+approach is to turn GeoLife hotspots into ordinary zones — they would be far from the user, so they
+are deliberately <strong>not</strong> shipped as the default "sample areas", which instead sit around the user.</p>
+<hr />
+<h2 id="8-key-less-map-hardening-offline-cache-mirrors-diagnostics-2026-10-16">8. Key-less map hardening: offline cache, mirrors, diagnostics (2026-10-16)</h2>
+<p>After choosing to keep improving the <strong>key-less</strong> map rather than configuring a Google key, the
+fallback was hardened so a tourist on a flaky network still sees streets.</p>
+<p><strong>Evidence gathered before coding (from this machine):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mirror</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>https://tile.openstreetmap.org/13/4093/2723.png</code></td>
+<td>HTTP 200, <code>image/png</code>, 41 KB</td>
+</tr>
+<tr>
+<td><code>https://tile.openstreetmap.de/13/4093/2723.png</code></td>
+<td>HTTP 200, <code>image/png</code>, 41 KB</td>
+</tr>
+<tr>
+<td><code>https://a.tile.openstreetmap.fr/osmfr/13/4093/2723.png</code></td>
+<td>HTTP 200, <code>image/png</code>, 39 KB</td>
+</tr>
+<tr>
+<td><code>https://tile.openstreetmap.fr/osmfr/…</code> (no subdomain)</td>
+<td>HTTP 404 — rejected</td>
+</tr>
+<tr>
+<td><code>https://tile.openstreetmap.se/hydda/full/…</code></td>
+<td>dead — rejected</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Changes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ui/map/TilePolicy.kt</code></td>
+<td><strong>New, pure.</strong> The three verified mirror templates; <code>urlFor()</code>; <code>cacheName()</code>; <code>hostsFrom(preferred)</code> fail-over order; <code>evictions()</code> LRU rule; a 40 MB cache cap.</td>
+</tr>
+<tr>
+<td><code>ui/components/TileDiskCache.kt</code></td>
+<td><strong>New.</strong> Size-bounded on-disk cache of raw tile PNGs under <code>cacheDir/osm-tiles</code>, so viewed areas render with <strong>no network</strong> and survive a restart. All I/O is failure-soft.</td>
+</tr>
+<tr>
+<td><code>ui/components/OfflineOsmMap.kt</code></td>
+<td>Disk cache is consulted before the network; successful fetches are cached and trimmed. The mirror that worked is remembered and tried first. Tap the top-left caption for <strong>diagnostics</strong>: cache size, zoom/centre, <strong>"Check map servers"</strong> (probes every mirror, reports <code>ok</code>/<code>HTTP …</code>), <strong>"Clear map cache"</strong>. Added <strong>zoom in/out</strong> buttons.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Verification:</strong> <code>:app:testDebugUnitTest</code> + <code>:app:assembleDebug</code> → <strong>BUILD SUCCESSFUL, 183 tests, 0
+failures, 0 skipped</strong> (166 + 11 <code>TilePolicyTest</code> + 6 <code>TileDiskCacheTest</code>). Enumerated acceptance cases
+extended to <strong>56</strong> (MAP-07…MAP-16). APK rebuilt: 18.39 MB, SHA-256
+<code>253163A75043B0CB673287CE4D2119D2CECD1B9B57EB7861D52BCA2C38C531B3</code>.</p>
+<p><strong>Still not device-verified:</strong> the cache actually serving a map offline after a restart, the mirror
+fail-over / server-check on a real network, and the zoom buttons (INST-09…INST-11 in
+<code>docs/test_report.md</code>). The cache's real file behaviour and the mirror policy <strong>are</strong> unit-tested.</p>
+<hr />
+<h2 id="9-four-independent-tile-providers-2026-10-17">9. Four independent tile providers (2026-10-17)</h2>
+<blockquote>
+<p><strong>Later reversed in part.</strong> CARTO Voyager was added here as the default but was <strong>removed</strong> in a later
+round: it began serving a "CARTO" watermark instead of a map under the app's request conditions.
+<code>TilePolicy.PROVIDERS</code> is now <strong>three</strong> providers — OpenStreetMap (default), Esri World Street Map and
+OpenTopoMap — and <code>TilePolicyTest</code> asserts CARTO is not offered. The rest of this section is the
+historical record of that round.</p>
+</blockquote>
+<p><strong>Feedback.</strong> "the map is not connecting bro like if u need api pls give the free source ill add if u
+want" — i.e. tiles still not arriving, and the user is willing to add a key.</p>
+<p><strong>Diagnosis.</strong> A <em>single</em> tile server is a single point of failure: a school, hotel or mobile-carrier
+network can block one hostname and leave the map blank. The app previously had one style (OpenStreetMap)
+with three mirrors on neighbouring hostnames — a network that blocks OSM's tile servers blocks all of
+them at once.</p>
+<p><strong>Evidence gathered before coding (all from this machine, same tile <code>13/4093/2723</code>):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Host checked</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenStreetMap</td>
+<td><code>tile.openstreetmap.org</code></td>
+<td>HTTP 200, <code>image/png</code>, 41 KB</td>
+</tr>
+<tr>
+<td>OpenStreetMap</td>
+<td><code>tile.openstreetmap.de</code></td>
+<td>HTTP 200, <code>image/png</code>, 41 KB</td>
+</tr>
+<tr>
+<td>OpenStreetMap</td>
+<td><code>a.tile.openstreetmap.fr/osmfr</code></td>
+<td>HTTP 200, <code>image/png</code>, 39 KB</td>
+</tr>
+<tr>
+<td>CARTO Voyager</td>
+<td><code>a./b./c.basemaps.cartocdn.com</code></td>
+<td>HTTP 200, <code>image/png</code></td>
+</tr>
+<tr>
+<td>Esri World Street Map</td>
+<td><code>server.arcgisonline.com</code> (<code>{z}/{y}/{x}</code>)</td>
+<td>HTTP 200, <code>image/jpeg</code>, 37 KB</td>
+</tr>
+<tr>
+<td>OpenTopoMap</td>
+<td><code>a./b./c.tile.opentopomap.org</code></td>
+<td>HTTP 200, <code>image/png</code>, 48 KB</td>
+</tr>
+<tr>
+<td>— rejected —</td>
+<td><code>tile.openstreetmap.fr/osmfr</code> (no subdomain)</td>
+<td>HTTP 404</td>
+</tr>
+<tr>
+<td>— rejected —</td>
+<td><code>tile.openstreetmap.se/hydda/full</code></td>
+<td>dead</td>
+</tr>
+<tr>
+<td>— rejected —</td>
+<td><code>tile.openstreetmap.org.b-cdn.net</code></td>
+<td>TLS trust failure</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Changes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ui/map/TilePolicy.kt</code></td>
+<td>Re-modelled as <code>Provider</code>s — one <strong>basemap style</strong> with its own mirror hosts and its required attribution. Four key-free providers: OpenStreetMap, CARTO Voyager, Esri World Street Map, OpenTopoMap. <code>urlFor()</code> now honours the template's own token order (Esri is <code>{z}/{y}/{x}</code>). <code>cacheName()</code> is <strong>provider-scoped</strong> so two styles can never be confused.</td>
+</tr>
+<tr>
+<td><code>ui/components/OfflineOsmMap.kt</code></td>
+<td>Tries providers in order and keeps <strong>one provider for the whole viewport</strong> — on a switch it restarts cleanly instead of drawing a patchwork of two styles, and the number of switches is bounded. The status line and the diagnostics show the <strong>active provider name</strong>; <em>Check map servers</em> now probes all four; the provider's required <strong>attribution</strong> is shown on the map.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>On the offer of an API key:</strong> the Google Maps path is complete and already wired
+(<code>docs/google_maps_setup.md</code> — a free Maps SDK for Android key from Google Cloud, pasted into
+<code>local.properties</code> as <code>MAPS_API_KEY=…</code>). No code change is needed; the app switches to Google tiles the
+moment a key is present. The provider work above means the app is <strong>usable with no key at all</strong>, which
+the user chose.</p>
+<p><strong>Verification:</strong> <code>:app:testDebugUnitTest</code> + <code>:app:assembleDebug</code> → <strong>BUILD SUCCESSFUL, 186 tests, 0
+failures, 0 skipped</strong> (<code>TilePolicyTest</code> grew 11 → 14). Enumerated acceptance cases extended to <strong>60</strong>
+(MAP-17…MAP-20). APK rebuilt: 18.39 MB, SHA-256
+<code>A9F1A5D3846F3C2E8313CC51D35B389743A3F5991A9B6170C7CEDAA8BBF05DC3</code>.</p>
+<p><strong>Still not device-verified:</strong> that the provider fail-over actually recovers a blocked host on the
+user's network (INST-10). The provider list, URLs, key-scoping and order <strong>are</strong> unit-tested, and all
+four providers were confirmed reachable from the build machine.</p>
+<p><strong>Encoding note:</strong> an earlier edit of <em>this log</em> was written through PowerShell <code>Set-Content</code> without
+an explicit encoding, which double-encoded its non-ASCII characters. It was detected (wrong byte
+count) and reversed exactly, restoring 14 em dashes, 12 ellipses and 10 arrows with zero replacement
+characters. Only this one file was affected; the code and the other documents were edited with tools
+that preserve UTF-8.</p>
+<hr />
+<h2 id="10-real-device-bug-fix-round-invisible-marker-auto-close-zoom-typed-corners-2026-10-17">10. Real-device bug-fix round: invisible marker, auto-close, zoom, typed corners (2026-10-17)</h2>
+<p><strong>Feedback (verbatim).</strong> "the real tracking the blue mark is not visible i seen / and in seconds app
+closed automatically / i feel when i add location like polygon need 2 time in manyal entry and latitute
+and logitude entry because since the map is wide when i draw it iwll more so / and the map view shld be
+close not that wide / and seems like backend is not added".</p>
+<p>Six screenshots were attached. <strong>They did not arrive on this machine as files</strong>, so everything below is
+based on that written description. That is a real limitation of this round: the screenshots were never
+opened. Stated plainly rather than glossed over.</p>
+<h3 id="101-the-blue-mark-was-green-root-cause-found">10.1 The "blue mark" was green — root cause found</h3>
+<p><code>ui/theme/Color.kt</code> had <code>val UserMarkerAccent = Color(0xFF0B6E4F)</code> — the app's <strong>own dark forest green</strong>
+— and <code>SafeStroke</code> is <code>0xFF1B7F4C</code>. The "you are here" dot was therefore painted the same colour as a
+<strong>SAFE zone's fill</strong> and the same colour as the theme. That is exactly why it could not be seen: every
+other map app has taught the user to look for <em>blue</em>, and this dot was green-on-green.</p>
+<table>
+<thead>
+<tr>
+<th>Fix</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ui/theme/Color.kt</code></td>
+<td><code>UserMarkerAccent = 0xFF1A73E8</code> (the conventional "my location" blue) and a new <code>UserMarkerOutline = 0xFF0B3C7A</code>.</td>
+</tr>
+<tr>
+<td><code>ui/components/OfflineOsmMap.kt</code></td>
+<td>Marker redrawn for contrast on any basemap: blue halo → dark outline → white collar → blue disc → white pip.</td>
+</tr>
+<tr>
+<td><code>ui/components/OfflineOsmMap.kt</code></td>
+<td>With <strong>no live fix</strong>, a <strong>hollow grey</strong> ring is drawn at the OS's last-known position, so the map is not empty — and a hollow ring can never be mistaken for a live fix.</td>
+</tr>
+<tr>
+<td><code>ui/components/OfflineOsmMap.kt</code></td>
+<td>A status line now says why the dot may be missing: <code>● You are here (±8 m)</code>, <code>○ Last known only — tap Start tracking</code>, or <code>○ No position yet — tap Start tracking</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="102-in-seconds-app-closed-automatically">10.2 "In seconds app closed automatically"</h3>
+<p><strong>Not reproduced</strong> — no emulator here and <code>adb devices</code> is empty, so there is no logcat and no way to see
+the crash. Rather than claim a fix, this round does two things: it removes the most likely causes, and it
+installs the instrumentation needed to identify the real one.</p>
+<p><strong>The instrumentation (new):</strong></p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>diagnostics/CrashLog.kt</code></td>
+<td>Installed from <code>TouristSafetyApp.onCreate</code>; records the most recent uncaught exception (newest first, bounded to 40,000 chars) in <code>filesDir/last-crash.txt</code>. Never uploads anything.</td>
+</tr>
+<tr>
+<td><code>ui/components/CrashReportDialog.kt</code> + <code>MainActivity</code></td>
+<td>On the next launch, a <strong>"Last run ended unexpectedly"</strong> dialog shows the recorded trace with a <strong>Copy</strong> button. This is the only realistic way to diagnose a crash on a phone with no logcat.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The likely causes, now removed.</strong> The previous tile loader started <strong>one coroutine per visible tile on
+every change</strong> of camera, zoom, viewport, retry token or provider — and a pan changes <code>center</code> on every
+frame, so a drag produced a burst of requests per frame. Worse, the in-memory <code>tiles</code> map was <strong>never
+pruned</strong>: it accumulated every tile ever viewed, at every zoom level, so a few minutes of panning on a
+real phone is an out-of-memory kill. Both are genuine OOM paths, not speculation.</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>140 ms settle delay before tiles are requested</td>
+<td>The effect is cancelled and restarted on each camera change, so this de-bounces a pan into a single batch.</td>
+</tr>
+<tr>
+<td>Tiles loaded in batches of 4 (<code>TILE_LOAD_BATCH</code>)</td>
+<td>Bounds simultaneous sockets and coroutines.</td>
+</tr>
+<tr>
+<td>Tiles outside the settled viewport are dropped from <code>tiles</code></td>
+<td>The in-memory map can no longer grow without limit.</td>
+</tr>
+<tr>
+<td><code>LruCache</code> sized in <strong>bytes</strong> (8 MB) instead of 128 entries</td>
+<td>No longer can pin ~33 MB of bitmaps.</td>
+</tr>
+<tr>
+<td><code>TilePolicy.providersToTry(preferred, down)</code> — new, unit-tested</td>
+<td>Once a provider fails for a tile it is skipped for the rest of the viewport, so a dead network costs one round of attempts instead of ten <strong>per tile</strong>.</td>
+</tr>
+<tr>
+<td>Timeouts 6 s → 5 s</td>
+<td>A blank map says "Street map offline — Retry" sooner.</td>
+</tr>
+<tr>
+<td>The whole load wrapped in <code>try</code>/<code>catch (CancellationException)</code> rethrow</td>
+<td>No tile problem can take the app down.</td>
+</tr>
+</tbody>
+</table>
+<p>This is a fix for a <strong>plausible</strong> cause plus instrumentation for the real one. It is <strong>not</strong> a verified
+fix of the reported crash, and it is not claimed as one.</p>
+<h3 id="103-the-map-view-should-be-close-not-that-wide">10.3 "The map view should be close, not that wide"</h3>
+<p><code>DEFAULT_ZOOM</code> raised from 15 to <strong>17</strong> (about 1.2 m per pixel, roughly a kilometre across a phone
+screen), so a boundary drawn by tapping covers the place the user meant instead of a whole town. The
+editor's map box also grew 280 dp → 320 dp, and <code>GeoFenceEditorScreen</code> now draws the <strong>already-saved
+zones behind the draft</strong> — which is what makes "add another area" placeable <em>in context</em> instead of on a
+blank map. (The camera also opens at zoom 17 where a key is present: <code>CameraInitialPosition(zoom = 17f)</code>.)</p>
+<h3 id="104-need-2-times-in-manual-entry-and-latitude-and-longitude-entry">10.4 "Need 2 times in manual entry, and latitude and longitude entry"</h3>
+<p>The sentence contains two distinct problems.</p>
+<ol>
+<li><strong>A refused tap was silent.</strong> <code>addVertex</code> returned the state unchanged when the tap landed on the
+   previous vertex, so the map appeared to ignore the tap — which reads as "I have to tap twice". It now
+   says so: <em>"That corner is on top of the previous one — tap further away."</em></li>
+<li><strong>There was no coordinate entry at all.</strong> <code>GeoFenceEditorScreen</code> gained a Latitude/Longitude row with
+   <strong>Add point</strong> and <strong>Fill from my position</strong>. The fill button is what makes southern/western coordinates
+   workable: a phone's decimal keypad has <strong>no minus sign</strong>, so typing "−33.9" is impossible — prefilling
+   from the current fix means the sign is already on screen and only the digits are edited. The parser
+   also accepts a comma as the decimal separator (a comma-locale keypad produces <code>12,9716</code>), and every
+   rejection gives a readable reason instead of doing nothing.</li>
+</ol>
+<p>Covered by 6 new unit tests in <code>GeoFenceEditorViewModelTest</code>: typed vertex, comma separator, out-of-range
+latitude, nonsense input, and a complete polygon built purely from typed coordinates and saved.</p>
+<h3 id="105-seems-like-backend-is-not-added">10.5 "Seems like backend is not added"</h3>
+<p>Correct — and it is deliberate, not a regression. <strong>There is no server in this project.</strong> Alerts and SOS
+are written to a Room-backed <strong>outbox</strong> and delivered through <code>NoBackendTransport</code>, so they are durably
+queued and labelled honestly as <strong>"Queued (offline)"</strong>. Nothing anywhere claims delivery. Adding a
+backend is separate, out-of-scope work; the outbox is already the client half of it, so a real transport
+could be dropped in without touching the UI.</p>
+<p>The watch screen now says so where the user actually looks: under <em>SOS delivery</em> it reads "No backend
+server is configured in this build, so queued events are held safely on this phone and nothing is ever
+reported as delivered."</p>
+<h3 id="106-flaky-watch-test-found-while-verifying-not-a-product-bug">10.6 Flaky watch test found while verifying (not a product bug)</h3>
+<p>The full-suite run intermittently failed
+<code>WatchControllerTest &gt; sos is reported delivered when a transport accepts it</code>, and once with a 20-second
+wait too. Investigated rather than re-run until green: with the JVM warm, every test in that class takes
+0.6 s, but <strong>whichever test is running when Robolectric first instruments Room's generated classes pays
+several seconds of one-off cost</strong>. When that landed inside a wall-clock-polled assertion, the 5-second
+<code>awaitUntil</code> default expired — a test-scheduler artefact, unrelated to the SOS code.</p>
+<p>Two changes, both disclosed: the two SOS tests get a <strong>60-second ceiling</strong> (the happy path is unchanged at
+~0.6 s; a timeout is a ceiling, not a cost), and <code>awaitUntil</code> now <strong>drains Robolectric's paused main
+looper</strong> while polling, because Room posts its invalidation callbacks there. The assertions themselves are
+untouched, so a genuinely broken SOS path still fails.</p>
+<blockquote>
+<p><strong>Superseded — see §11.1.</strong> The diagnosis above is wrong on both counts, and the
+<code>ShadowLooper.idleMainLooper()</code> change made the flake <em>worse</em> rather than better. It is left in place
+because the reasoning is the instructive part: a plausible mechanism was adopted without being
+measured. The real cause was a full <code>C:</code> drive (§11.2). The 60-second ceiling has been kept — that part
+was harmless.</p>
+</blockquote>
+<p><strong>Verification (this machine):</strong> <code>:app:testDebugUnitTest</code> + <code>:app:assembleDebug</code> → <strong>BUILD SUCCESSFUL,
+196 tests, 0 failures, 0 errors, 0 skipped</strong> (<code>TilePolicyTest</code> 14 → 18, <code>GeoFenceEditorViewModelTest</code>
+8 → 14). APK <strong>18.32 MB</strong>, SHA-256
+<code>6261B017275065B1CA19992A3BEBED486D37C39229F0E8110DBE2F1463874FA3</code>. Enumerated acceptance cases
+extended to <strong>70</strong> (MAP-21, MAP-22, EDIT-01…EDIT-04, INST-12…INST-15).</p>
+<p><strong>Still not device-verified:</strong> everything in 10.1–10.4 <em>as rendered</em> (marker visibility over real tiles,
+the zoom level, the coordinate row, the crash dialog), the diagnosis in 10.2, and the six screenshots,
+which were never opened here.</p>
+<hr />
+<h2 id="11-correction-real-ml-models-approach-risk-briefing-and-a-google-like-map">11. Correction, real ML models, approach-risk briefing, and a Google-like map</h2>
+<p><em>Later on 2026-10-17. This section supersedes §10.6 and records the largest piece of work in the project:
+the movement/fall models are now actually trained, evaluated and shipped rather than described.</em></p>
+<h3 id="111-correction-the-flaky-watch-test-was-not-a-test-scheduler-artefact">11.1 Correction: the flaky watch test was not a test-scheduler artefact</h3>
+<p>§10.6 recorded a mechanism that had not been measured, and the "fix" derived from it was wrong:</p>
+<ul>
+<li><strong>The claim:</strong> Robolectric's one-off instrumentation cost was expiring the 5 s <code>awaitUntil</code> default, and
+  Room posts its invalidation callbacks to the paused main looper, so <code>awaitUntil</code> was changed to call
+  <code>ShadowLooper.idleMainLooper()</code> on every poll.</li>
+<li><strong>Measured instead of assumed:</strong> a temporary diagnostic printed the outbox row and the collected <code>Flow</code>
+  every 250 ms. The row reaches <code>SENT</code> and the <code>Flow</code> reports it within <strong>~125 ms</strong>, with <strong>no</strong>
+  main-looper draining at all — Room refreshes invalidations on its own query executor, so the drain was
+  never needed.</li>
+<li><strong>The drain was actively harmful.</strong> Called from the main thread inside <code>runBlocking</code>,
+  <code>idleMainLooper()</code> cost roughly <strong>1.5 s per call</strong> and starved the very background work being awaited.
+  With the drain in place the "SOS delivered" test spent its entire 60 s ceiling inside the loop, and the
+  sibling SOS test took <strong>24 s</strong> where it should take under a second. The drain is now removed, and
+  <code>awaitUntil</code> is a plain real-time poll.</li>
+</ul>
+<h3 id="112-the-actual-cause-the-c-drive-was-full">11.2 The actual cause: the <code>C:</code> drive was full</h3>
+<p>Three symptoms that all pointed the same way, once they were noticed together:</p>
+<ul>
+<li><code>Copy-Item</code> failed with <strong>"There is not enough space on the disk."</strong></li>
+<li><code>Get-Content -Raw</code> returned nothing for a file that <code>[xml]</code> had just parsed successfully.</li>
+<li>A test report declared <code>failures="5"</code> but contained <strong>no failure text at all</strong> — the write had been
+  truncated.</li>
+</ul>
+<p><code>C:</code> had <strong>0 bytes free</strong> out of 96.8 GB. The build, the JDK, the Android SDK and <code>GRADLE_USER_HOME</code> all
+live on <code>D:</code>, but JVM temp files, Robolectric's scratch space and the test-report writes go to
+<code>C:</code> through <code>%LOCALAPPDATA%\Temp</code>. Freed by clearing the recycle bin (796 MB) and the npm cache
+(4.55 GB) → <strong>5.28 GB free</strong>. Three consecutive full-suite runs then passed with no change to any test.</p>
+<p>The flakiness was never in the SOS code, the Room flows, or the coroutine scheduling. Honest note: this
+is an environment defect, not a code fix, and four three-minute test cycles were spent on hypotheses
+before free disk space was checked — which should have been the first thing to check on a machine that
+reports "not enough space".</p>
+<h3 id="113-a-real-ordering-guard-in-the-watch-controller-kept-but-not-the-cause">11.3 A real ordering guard in the watch controller (kept, but not the cause)</h3>
+<p>While the flake was still unexplained, <code>WatchController</code> was also changed, and those changes are kept
+because they stand on their own merits:</p>
+<ul>
+<li>After <code>flush()</code> returns, the controller <strong>re-reads the outbox row</strong> and updates the face directly,
+  instead of waiting for Room's change notification. This removes a real latency: the watch face no
+  longer sits on "Queued on the device" for an SOS that has already been delivered.</li>
+<li><code>SosDeliveryState.afterObserving(...)</code> makes a settled <code>DELIVERED</code>/<code>FAILED</code> outcome <strong>sticky for its own
+  event</strong>, so a late "still queued" observation cannot walk the indicator backwards, while a newly raised
+  SOS still resets it. Pinned by <code>SosDeliveryStateTest</code> (4 tests).</li>
+</ul>
+<p><strong>It is not claimed to have fixed the flake.</strong> §11.2 was the cause. The ordering rule is a guard against
+an interleaving Room is permitted to produce, not a bug that was observed.</p>
+<h3 id="114-crash-fix-the-blue-marker-appears-then-the-app-closes-report">11.4 Crash fix — the "blue marker appears, then the app closes" report</h3>
+<p>Signature captured by the in-app crash dialog:</p>
+<pre><code>java.lang.NullPointerException: CameraUpdateFactory is not initialized
+  at com.google.android.gms.maps.CameraUpdateFactory.newLatLng
+  at com.touristsafety.app.ui.components.SafetyMapKt$FollowLatestFix$1$1.invokeSuspend(SafetyMap.kt:99)
+</code></pre>
+<p>With no Google Maps API key configured, the wrapper never initialises the Play Services map SDK, but the
+live-follow effect still called <code>CameraUpdateFactory.newLatLng</code> every time a fix arrived — so the crash
+landed exactly when the blue marker first appeared. Fixed with a <code>googleCameraReady</code> guard plus
+<code>runCatching</code> in <code>followLatestFix</code>, <code>moveTo</code> and <code>fitPoints</code>, and <code>fitPoints</code> now returns early on
+degenerate bounds. Compile- and JVM-verified; <strong>not</strong> device-verified (§11.8).</p>
+<h3 id="115-real-machine-learning-activity-recognition-and-impactfall-detection">11.5 Real machine learning: activity recognition and impact/fall detection</h3>
+<p>The reviewer asked for a real trained model, not a stub. Two supervised models are now trained on
+<strong>UCI HAR</strong> — the activity dataset listed in <code>DATASETS.pdf</code> — exported to JSON, and walked on the phone by
+hand-written Kotlin in <code>motion/</code>. No TensorFlow, no TFLite, no PyTorch, no network at inference time.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Held-out result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Activity, 24 time-domain features, 32 trees</td>
+<td><strong>accuracy 0.8351, macro-F1 0.8333</strong> on 2947 windows from 9 subjects never seen in training</td>
+</tr>
+<tr>
+<td>Activity, 561-feature reference, 300 trees</td>
+<td>accuracy 0.9287, macro-F1 0.9271</td>
+</tr>
+<tr>
+<td>Activity, single decision tree, 24 features</td>
+<td>accuracy 0.7967, macro-F1 0.7943</td>
+</tr>
+<tr>
+<td>Impact/fall detector, 40 trees</td>
+<td><strong>ROC-AUC 0.9999, average precision 0.9999, F1@0.5 0.9962</strong></td>
+</tr>
+<tr>
+<td>Shuffled-label control</td>
+<td>ROC-AUC <strong>0.5198</strong> (chance)</td>
+</tr>
+</tbody>
+</table>
+<p>Two things are stated plainly rather than buried, because either could otherwise be read as a stronger
+claim than it is:</p>
+<ol>
+<li><strong>UCI HAR contains no falls.</strong> There is no fall label and no subject who fell, so the detector's
+   positives are <strong>impacts synthesised into real recorded windows</strong>. Its metrics measure detection of that
+   injected signature, on real held-out subjects. They are not a clinical fall-detection claim. The
+   shuffled-label control at 0.5198 is what shows the near-perfect score is the model finding the
+   signature, not a leak. The named upgrade path is SisFall / UniMiB SHAR / MobiFall — real falls.</li>
+<li><strong>The approach-risk score is not a model.</strong> See §11.6.</li>
+</ol>
+<p>An exporter bug was also caught before it shipped: scikit-learn's <code>tree_.value</code> holds <strong>class fractions,
+not counts</strong>, so the original <code>np.rint(tree.value)</code> collapsed every leaf to a one-hot vector. The model
+would have loaded, run, and answered — just wrongly. Now exported as
+<code>np.rint(tree.value * tree.weighted_n_node_samples)</code>, with a pytest regression guard on the root node's
+sample count.</p>
+<p>Verification that the shipped JSON is faithful:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml/har_verify_export.py</code> (Python walker vs scikit-learn)</td>
+<td>activity max probability error <strong>4.970e-07</strong>, 0 argmax mismatches; fall <strong>4.736e-07</strong>, 0 mismatches — <strong>ALL PASS</strong></td>
+</tr>
+<tr>
+<td><code>ForestReferenceTest</code> (Kotlin walker vs baked-in scikit-learn probabilities, real windows)</td>
+<td>3 tests, pass</td>
+</tr>
+<tr>
+<td><code>ml/tests/test_har_models.py</code></td>
+<td>21 tests, including byte-equality between <code>ml/outputs/**</code> and the copies under <code>app/src/main/assets</code> and <code>app/src/test/resources</code></td>
+</tr>
+</tbody>
+</table>
+<p>Full metrics, per-class tables, embedded confusion matrices, limitations and reproduction commands are in
+<strong><code>docs/model_card_movement.md</code></strong>.</p>
+<p>A stale number was found and fixed at its source while writing that card: the model spec claimed the UCI
+HAR test split was <strong>2949</strong> windows when it is <strong>2947</strong>. The string is no longer typed by hand — it is
+formatted from the arrays — and a pytest case fails if the wrong count comes back.</p>
+<h3 id="116-historical-risk-analysis-when-approaching-a-restricted-area">11.6 Historical risk analysis when approaching a restricted area</h3>
+<p><code>ApproachRiskModel</code> scores 0–100 from: zone severity (DANGEROUS 40 / RESTRICTED 28 / SAFE 5), the
+tourist's <strong>own recorded crossings</strong> of that zone (3 points per crossing in the last 7 days, capped at 18;
+4 points if never visited), proximity (up to 16), time of day (night 12, dusk 5), whether they are
+ambulating (4), and the live impact-detector score (12 above the 0.55 threshold, 6 neutral when the model
+is unavailable).</p>
+<p>The new <code>ApproachBriefingCard</code> shows the score, the band, and <strong>every factor with its points and its
+plain-language reason</strong>, plus the tourist's own history for that zone. It says in the card itself that this
+is a published weighted checklist rather than a learned danger probability, because the app has no
+labelled outcome data ("did something bad actually happen?") and will not pretend otherwise. The weights
+are in one place and unit-tested (<code>ApproachRiskTest</code>, <code>ApproachBriefingTest</code>, <code>ZoneHistoryTest</code> — 26 tests).</p>
+<h3 id="117-the-map-and-the-make-it-look-like-google-maps-request">11.7 The map, and the "make it look like Google Maps" request</h3>
+<ul>
+<li><strong>CARTO Voyager was made the default key-free basemap here</strong> — since <strong>removed</strong>, because it now serves
+  a watermark instead of a map under the app's request conditions. <code>TilePolicy.PROVIDERS</code> is now
+  OpenStreetMap (default), Esri World Street Map and OpenTopoMap, and the app never offers CARTO. OSM, Esri
+  and OpenTopoMap remain automatic fallbacks, and the existing rule that <strong>one basemap style serves the whole
+  viewport</strong> is unchanged, so the map never becomes a patchwork of two styles.</li>
+<li>A <strong>distance-to-boundary pill</strong> now sits over the tracking map ("320.0 m to SVIT Ground · risk 47/100"),
+  matching the reference design. It is driven by the same <code>ApproachBriefing</code> the card below renders, so the
+  two numbers cannot disagree.</li>
+<li><strong>Real Google tiles still require the user's own API key</strong>, which this build does not have
+  (<code>local.properties</code> holds the commented template only). That is a credential, not a coding problem, and
+  <code>docs/google_maps_setup.md</code> walks through obtaining a free key and where to paste it. The key-less map is
+  the fallback that makes the app work today.</li>
+</ul>
+<h3 id="118-verification-for-this-round">11.8 Verification for this round</h3>
+<blockquote>
+<p>This snapshot is refreshed at the end of each round; <strong>§13 carries the latest numbers</strong> for the
+checklist-completion round.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Command</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM suite</td>
+<td><code>:app:testDebugUnitTest</code></td>
+<td><strong>370 tests, 0 failures, 0 errors, 2 skipped</strong> across 35 classes</td>
+</tr>
+<tr>
+<td>APK build</td>
+<td><code>:app:assembleDebug</code></td>
+<td>BUILD SUCCESSFUL</td>
+</tr>
+<tr>
+<td>ML suite</td>
+<td><code>python -m pytest ml\tests -q</code></td>
+<td><strong>42 passed</strong></td>
+</tr>
+<tr>
+<td>Export fidelity</td>
+<td><code>python ml\har_verify_export.py</code></td>
+<td><strong>ALL PASS</strong></td>
+</tr>
+<tr>
+<td>Training reproducibility</td>
+<td>re-ran <code>ml\har_train.py</code></td>
+<td>identical metrics; regenerated <code>har_activity_model.json</code> <strong>byte-identical</strong> to the shipped copy</td>
+</tr>
+</tbody>
+</table>
+<p>APK <strong>18.44 MB</strong>, SHA-256
+<code>5B44E92AAA9FB0CC5F54C6BE180A0156F9AAE153CC93B287FC176D66CDC2FB2D</code>, copied to <code>Desktop</code> and <code>Downloads</code>.</p>
+<p><strong>Not device-verified, and recorded as such:</strong> everything sensor- or tile-rendering-related — the crash
+fix, the blue marker over real tiles, the distance pill, the movement card, and all live sensor inference.
+No emulator and no attached phone were available (<code>adb devices</code> was empty), so the instrumented cases
+INST-04…INST-21 remain <strong>NOT EXECUTED</strong>. The sensor pipeline is compile-checked and JVM-tested against
+recorded windows; it has not been observed on hardware by this project.</p>
+<p><strong>Still requires the user:</strong> the "Check map servers" readout if a device shows blank tiles, and a free
+Google Maps API key if real Google tiles are wanted.</p>
+<hr />
+<h2 id="12-backend-integration-round-a-real-transport-the-sos-path-and-the-officer-dashboard-2026-10-17">12. Backend integration round: a real transport, the SOS path, and the officer dashboard (2026-10-17)</h2>
+<h3 id="121-the-gap-and-the-root-cause">12.1 The gap, and the root cause</h3>
+<p>Earlier rounds built the durable <strong>outbox</strong>, the payloads, and an honest <code>NoBackendTransport</code> that
+refused to pretend an event had been delivered. But the app could never actually talk to anything, for a
+reason that was not a missing feature but a wiring bug:</p>
+<ul>
+<li><code>AppContainer</code> <strong>hard-coded</strong> the transport:
+  <code>syncTransport = NoBackendTransport(...)</code>. There was no code path from "the user configured an address"
+  to "events are sent", so setting an address could not have worked even if a server existed.</li>
+<li>There was <strong>no HTTP client at all</strong> in the app — no base-URL storage, no token storage, no request
+  builder, no response parser.</li>
+<li>Nothing on the officer side existed to receive a batch, decide a verdict per event, or work an SOS
+  queue.</li>
+</ul>
+<h3 id="122-what-was-built">12.2 What was built</h3>
+<ul>
+<li><strong>A real authority client</strong> (<code>app/src/main/java/com/touristsafety/app/authority/</code>): a hand-written JSON
+  reader/writer (<code>Json.kt</code> — used instead of <code>org.json</code>, which returns nulls on the plain JVM, so the
+  whole client stays unit-testable); the wire codec (<code>AuthorityApi.kt</code>); the HTTP layer over
+  <code>HttpURLConnection</code> (<code>AuthorityHttp.kt</code>); the client that ties them together (<code>AuthorityClient.kt</code>);
+  and the durable transport (<code>AuthoritySyncTransport.kt</code>).</li>
+<li><strong>A transport selector</strong> (<code>SelectingSyncTransport</code>) replaces the hard-coded stub: it delegates to the
+  real authority transport when a base URL is configured and to the honest <code>NoBackendTransport</code>
+  otherwise. Because it reads the address at flush time, <strong>setting an address takes effect on the next
+  flush with no app restart</strong>.</li>
+<li><strong>Session storage</strong> (<code>AuthoritySessionStore</code>) in its own DataStore file (<code>authority_session</code>), separate
+  from <code>AppSettings</code>, holding the base URL and the bearer token.</li>
+<li><strong>Emergency contacts</strong>, end to end: a new Room entity/DAO/repository, uploaded through the durable
+  outbox (<code>OutboxKind.CONTACTS</code>) rather than a direct <code>PUT</code>, so an offline edit still syncs. This is the
+  reason the schema moved to <strong>version 3</strong> (<code>AppDatabase.VERSION = 3</code>, additive <code>MIGRATION_2_3</code>).</li>
+<li><strong>UI</strong>: an <strong>Authority</strong> screen (enter address, sign in, see the real profile and delivery totals) and
+  an <strong>Emergency contacts</strong> screen, both reachable from Settings and a new top-bar cloud icon. The watch
+  screen's stale "no backend server is configured in this build" text was replaced with the <em>real</em>
+  persisted session state.</li>
+<li><strong>The backend</strong> (<code>backend/</code>): one Flask app over one SQLite file, serving both the phone API and a
+  static operator dashboard at <code>/</code> — <code>/auth/login</code>, <code>/me</code>, <code>/me/contacts</code>, the idempotent
+  <code>/sync/events</code>, and the authority routes (<code>/authority/overview|sos|events|tourists</code>, SOS
+  acknowledgement, tourist registration). It generates its own credentials on first start and writes them
+  once to <code>backend/var/DEV_CREDENTIALS.txt</code>; <strong>no password is written into the source</strong>.</li>
+</ul>
+<h3 id="123-the-delivery-rules-why-a-mistake-can-never-lose-an-event">12.3 The delivery rules (why a mistake can never lose an event)</h3>
+<p><code>AuthoritySyncTransport</code> maps the server's verdict onto the outbox like this — deliberately biased so
+that a <em>configuration</em> error keeps the event, and only a <em>permanent</em> rejection discards it:</p>
+<table>
+<thead>
+<tr>
+<th>Server outcome</th>
+<th>Outbox result</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DELIVERED</code></td>
+<td><strong>Delivered</strong> (ack id)</td>
+<td>the authority stored it</td>
+</tr>
+<tr>
+<td><code>DUPLICATE</code></td>
+<td><strong>Delivered</strong></td>
+<td>idempotency: the server already has it</td>
+</tr>
+<tr>
+<td><code>REJECTED</code> (or HTTP 400/422)</td>
+<td><strong>Rejected</strong> with the reason</td>
+<td>the same bytes can never be accepted</td>
+</tr>
+<tr>
+<td>HTTP 401 / 403</td>
+<td><strong>Retry</strong></td>
+<td>re-signing-in will deliver it</td>
+</tr>
+<tr>
+<td>404 / 409 / 5xx / IO error / malformed body</td>
+<td><strong>Retry</strong></td>
+<td>could be a misconfiguration; never discard</td>
+</tr>
+</tbody>
+</table>
+<h3 id="124-verification-for-this-round">12.4 Verification for this round</h3>
+<blockquote>
+<p>Historical snapshot of the backend-integration round. The current numbers are in <strong>§13.5</strong>.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Command</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM suite</td>
+<td><code>:app:testDebugUnitTest</code></td>
+<td><strong>370 tests, 0 failures, 0 errors, 2 skipped</strong> across 35 classes</td>
+</tr>
+<tr>
+<td>Authority client/transport/real-socket</td>
+<td><code>--tests com.touristsafety.app.authority.*</code></td>
+<td>51 tests pass (17 API, 15 transport, 10 real-socket, 9 codec)</td>
+</tr>
+<tr>
+<td>Emergency contacts + payloads</td>
+<td><code>--tests … EmergencyContactRepositoryTest … OutboxPayloadsTest</code></td>
+<td>14 tests pass</td>
+</tr>
+<tr>
+<td>Backend rules (in-process)</td>
+<td><code>python -m pytest backend\tests -q</code></td>
+<td><strong>174 passed</strong></td>
+</tr>
+<tr>
+<td>Backend acceptance (real subprocess)</td>
+<td><code>python backend\verify_integration.py</code></td>
+<td><strong>26/26 PASS</strong></td>
+</tr>
+<tr>
+<td>Live client → real server</td>
+<td><code>AuthorityLiveBackendTest</code> with <code>-Dtsm.e2e.baseUrl</code></td>
+<td><strong>2/2 passed</strong> (run on the JVM against <code>python backend\run.py</code>)</td>
+</tr>
+<tr>
+<td>APK build</td>
+<td><code>:app:assembleDebug</code></td>
+<td>BUILD SUCCESSFUL</td>
+</tr>
+</tbody>
+</table>
+<p>The live run is the one that matters for the "don't claim it works" rule: the <strong>production Kotlin
+client</strong> signed in as a real tourist, flushed a real SOS through <code>OutboxSyncer</code>, received a server event
+id, saw <code>/me</code> report <code>delivered=1</code> with <code>latestSos=OPEN</code> and <code>simulated=true</code>, and confirmed the officer
+queue held <strong>exactly one</strong> row after a duplicate delivery. See §7.1 of <code>docs/test_report.md</code> for the full
+transcript and the artifact path.</p>
+<p>Two things were found and fixed while doing this, rather than worked around:</p>
+<ul>
+<li>the <strong>schema-contract test</strong> still asserted <code>AppDatabase.VERSION == 2</code>; it now asserts the whole
+  contiguous 1→2→3 path, and a new test <strong>executes both migrations</strong> against a real SQLite database and
+  proves a pre-upgrade row survives (the instrumented <code>DatabaseMigrationTest</code> gained the matching 2→3 and
+  1→3 cases, but it needs a device, so it stays compile-checked only);</li>
+<li>a <strong>JDK-only quirk</strong>: <code>HttpURLConnection.getErrorStream()</code> returns null for a <strong>POST</strong> that answers 401,
+  because the JDK replays the request for authentication. <code>AuthoritySyncTransport</code> never reads the success
+  stream on a non-2xx, so it cannot hang, and a 401 still maps to Retry. Android's HTTP stack does not do
+  this, but that cannot be confirmed without a device — logged honestly.</li>
+</ul>
+<p>APK <strong>18.81 MB</strong>, SHA-256
+<code>7606A2796DD5B1E72A2FC4EBA79B9F40121953EA9F6549ED82258F3AF0EEBB36</code>, copied to the project root,
+<code>Desktop</code> and <code>Downloads</code> as <code>TouristSafety-backend-integration-2026-10-17.apk</code>.</p>
+<h3 id="125-running-the-backend-and-dashboard">12.5 Running the backend and dashboard</h3>
+<pre><code class="language-powershell">cd D:\TouristSafetyMonitoring-src
+python backend\run.py                 # dashboard: http://127.0.0.1:8080/   health: /api/v1/health
+python backend\run.py --host 0.0.0.0  # reachable from a phone on the same network
+</code></pre>
+<p>Point the phone at it in the app: <strong>cloud icon → Authority connection</strong> (or <strong>Settings → Connection &amp;
+sign-in</strong>). Emulator uses <code>10.0.2.2:8080</code>; a phone on the same Wi-Fi uses the LAN address <code>run.py</code>
+prints. Then sign in with the tourist id and password. Until an address is set <strong>and</strong> a tourist is
+signed in, every event stays queued on the phone and the app says so.</p>
+<blockquote>
+<p><em>Superseded by §16.3:</em> the cloud icon is gone and there is no longer a combined "Connection &amp; sign-in"
+screen. The address lives in <strong>Settings → Backend connection (advanced)</strong>, sign-in has its own tourist
+screen, and the officer console is a separate, server-enforced role.</p>
+</blockquote>
+<h3 id="126-still-requires-a-device-or-a-server-stated-not-hidden">12.6 Still requires a device or a server (stated, not hidden)</h3>
+<ul>
+<li><strong>On a device that has never been done here:</strong> the Authority screen and contacts screen rendering, the
+  permission/sign-in flow against a reachable server, and the device's own HTTP stack over emulator
+  loopback / Wi-Fi — recorded as <strong>INST-20, INST-21 NOT EXECUTED</strong> in <code>docs/test_report.md</code>.</li>
+<li><strong>The dashboard was verified at the API level and by static-asset serving</strong>, not by clicking through it
+  in a browser.</li>
+<li><strong>The app still does not send periodic <code>POSITION</code> reports</strong>, so the dashboard's "latest position" only
+  moves on a zone alert or an SOS. This is deferred until a battery/frequency policy is chosen — recorded
+  rather than hidden. <em>(Closed in §13: routine position reporting now exists, behind an explicit
+  interval/distance policy the tourist can turn off.)</em></li>
+</ul>
+<hr />
+<h2 id="13-checklist-completion-round-position-reporting-pin-sign-in-status-indicators-and-the-remaining-datasets-2026-10-17">13. Checklist-completion round: position reporting, PIN sign-in, status indicators, and the remaining datasets (2026-10-17)</h2>
+<p>This round started from an audit of the eight checklist items rather than from new code, and only built
+what was genuinely absent. §12.6's two open items — <strong>no periodic <code>POSITION</code> reports</strong> and <strong>no PIN</strong> —
+are both closed here.</p>
+<h3 id="131-item-1-gps-geofencing-offline-sync-the-one-real-gap">13.1 Item 1 (GPS / geofencing / offline sync) — the one real gap</h3>
+<p>Tracking, polygon geofencing, entry/exit alerts and the durable outbox already existed, and the backend
+already accepted and rendered <code>POSITION</code>. The missing piece was entirely app-side: nothing ever <em>enqueued</em>
+a routine position. Added:</p>
+<ul>
+<li><code>OutboxKind.POSITION</code>, with <code>OutboxPayloads.position(reading, timestampMillis)</code> and a
+  <code>position:&lt;fixTimestamp&gt;</code> dedupe key (mirroring <code>backend/tsm/payloads.py</code>);</li>
+<li><code>PositionReportPolicy</code> + <code>PositionReporter</code> — a documented throttle (default <strong>60 s / 100 m</strong>, with
+  interval choices) that <strong>refuses simulated readings and out-of-range coordinates</strong>, and queues nothing
+  until an authority address is configured so the queue cannot grow unbounded on a personal build;</li>
+<li>a <strong>Settings → Authority reporting</strong> card to enable it and pick the interval.</li>
+</ul>
+<p><code>docs/</code> and the code state the policy explicitly: position reports are a battery/data trade-off, and the
+first report after an address is configured is sent immediately rather than waiting out an interval.</p>
+<h3 id="132-item-5-id-pin-and-item-6-sos-acknowledgement">13.2 Item 5 (ID + PIN) and item 6 (SOS acknowledgement)</h3>
+<ul>
+<li><strong>PIN, end to end.</strong> The server stores a scrypt-hashed PIN (new <code>pin_salt</code>/<code>pin_hash</code> columns, added
+  idempotently on connect), generates one on first start and prints it <strong>once</strong> (it is deliberately <em>not</em>
+  written to <code>DEV_CREDENTIALS.txt</code>, which stays a three-field <code>role/id/password</code> table). <code>POST /auth/login</code>
+  accepts a <code>pin</code> <strong>or</strong> a <code>password</code>; <code>PUT /me/pin</code> validates 4–8 digits; an operator can never use a PIN.
+  The app gained a PIN/Password toggle, a numeric field, and <strong>Set or change PIN</strong>.</li>
+<li><strong>Acknowledgement visible to the tourist.</strong> <code>GET /me</code> now returns <code>latestSos</code> (status, officer, times,
+  simulated) and <code>latestPosition</code>; the Authority screen renders the SOS state and the position on file.</li>
+</ul>
+<h3 id="133-item-7-ui-map-indicators">13.3 Item 7 (UI, map, indicators)</h3>
+<ul>
+<li>A <strong>GPS status card</strong> on Home that distinguishes <em>Waiting for permission / Acquiring / Live / Poor
+  accuracy / Permission denied / Location unavailable</em>, with fix age and accuracy — computed from the real
+  permission + settings state, not a placeholder.</li>
+<li>An <strong>Authority upload</strong> card: the configured address, who is signed in, and how many events are waiting.</li>
+<li><strong>Responsive fixes</strong>: the remaining action rows and filter-chip rows that could squeeze on a narrow phone
+  now use the wrapping <code>ActionButtonRow</code> / <code>FilterChipRow</code> primitives (<code>SettingsScreen</code>,
+  <code>AuthorityScreen</code>, <code>SimulationScreen</code>, <code>GeoFenceEditorScreen</code>, <code>ManageZonesScreen</code>, <code>WatchScreen</code>,
+  <code>EmergencyContactsScreen</code>, <code>HomeScreen</code>). The map still needs no Google key: the OSM default is the
+  key-less basemap, with attribution, on-disk caching and fail-over, and CARTO is not offered.</li>
+</ul>
+<h3 id="134-items-24-eda-inference-history-risk">13.4 Items 2–4 (EDA, inference, history, risk)</h3>
+<p>The activity/fall models, confusion matrices, model cards and the 12-item GeoLife EDA were already present
+and were left untouched. Added, as separate reproducible scripts with no new dependencies:</p>
+<ul>
+<li><code>ml/osm_eda.py</code> — <strong>real</strong> OpenStreetMap EDA via the Overpass API: a 1.5 km × 1.5 km Tiananmen extract,
+  <strong>12,783 nodes / 3,197 ways / 0 relations</strong>, 5,681 nodes/km², with the exact query, endpoint, fetch time
+  and ODbL attribution recorded, plus a <code>NOT_RUN</code> path if every mirror fails;</li>
+<li><code>ml/weather_eda.py</code> — real weather for two sites over <strong>2011-01-01 … 2012-07-27</strong> (574 days each). The
+  brief names the OpenWeatherMap API, whose key was not provided, so the shipped artefacts use the key-free
+  <strong>Open-Meteo</strong> archive and say so on every artefact — never presented as OpenWeatherMap data;</li>
+<li><code>ml/har_eda.py</code> — the missing UCI HAR figure set (561 features, 7,352/2,947 windows, subject-disjoint
+  21/9, gravity 1.0323 g);</li>
+<li><code>ml/history.py</code> — historical trajectory, temporal and <strong>zone-crossing</strong> trends on real GeoLife data
+  (18,670 trajectories / 182 users; a derived densest-cell zone with <strong>431 crossing trajectories, 430
+  entries / 426 exits</strong>);</li>
+<li><code>ml/transport_mode.py</code> — a genuine <strong>supervised</strong> model on the only valid target in the data (GeoLife
+  transportation mode): subject-disjoint, <strong>accuracy 0.8475 / macro-F1 0.5784</strong> on unseen users.</li>
+</ul>
+<p><strong>On "future-risk prediction" (item 4):</strong> none of the four datasets carries an injury/danger/incident
+outcome, so there is no valid supervised target and <strong>no risk model is shipped</strong>. The app's <code>ApproachRisk</code>
+score remains the documented weighted heuristic it always was. This is stated in
+<code>docs/dataset_and_eda.md</code> §10 and the model card rather than papered over with a fabricated model.</p>
+<h3 id="135-verification-for-this-round">13.5 Verification for this round</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Command</th>
+<th>Result (measured)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM suite</td>
+<td><code>:app:testDebugUnitTest</code></td>
+<td><strong>390 tests, 0 failures, 0 errors, 4 skipped</strong> across 37 classes</td>
+</tr>
+<tr>
+<td>Backend rules (in-process)</td>
+<td><code>python -m pytest backend\tests -q</code></td>
+<td><strong>192 passed</strong> (was 174; +18 PIN)</td>
+</tr>
+<tr>
+<td>Backend acceptance (real subprocess)</td>
+<td><code>python backend\verify_integration.py</code></td>
+<td><strong>26/26 PASS</strong></td>
+</tr>
+<tr>
+<td>Live client → real server</td>
+<td><code>AuthorityLiveBackendTest</code> with <code>-Dtsm.e2e.baseUrl=http://127.0.0.1:8081</code></td>
+<td><strong>4/4 passed, 0 skipped</strong></td>
+</tr>
+<tr>
+<td>ML suite</td>
+<td><code>python -m pytest ml\tests -q</code></td>
+<td><strong>86 passed</strong> (was 42; +44 for the new analyses)</td>
+</tr>
+<tr>
+<td>APK build</td>
+<td><code>:app:assembleDebug</code></td>
+<td>BUILD SUCCESSFUL</td>
+</tr>
+</tbody>
+</table>
+<p>The four live tests ran against a real <code>python backend\run.py</code>: SOS delivery + idempotency + officer queue;
+a <strong>position report</strong> landing on the authority map (<code>/me latestPosition: 18.5204,73.8567 simulated=false</code>);
+<strong>PIN set then PIN sign-in</strong> (wrong PIN → HTTP 401); and a dead backend leaving the event queued with its
+reason. The 4 skips in a normal run are exactly these four opt-in tests.</p>
+<p>APK <strong>18.82 MB</strong>, SHA-256
+<code>592B8B63E81010647AC61C3B54F202284C9126C1D7EC5AA5DB0612D6A8BB7D2F</code>, copied to the project root,
+<code>Desktop</code> and <code>Downloads</code> as <code>app-debug.apk</code>.</p>
+<h3 id="136-still-not-done-here-stated-not-hidden">13.6 Still not done here (stated, not hidden)</h3>
+<ul>
+<li><strong>No emulator or device</strong> (<code>adb devices</code> was empty), so on-hardware GPS, the permission dialogs, the
+  <code>ON_RESUME</code> recovery, device rendering of the Authority/contacts screens, the device HTTP stack and the
+  new status-card layout remain <strong>NOT EXECUTED</strong> (INST-04…INST-21 in <code>docs/test_report.md</code>).</li>
+<li><strong>No Google Maps API key</strong> was available; the key-less OSM basemap is what is built.</li>
+<li><strong>The OpenStreetMap Overpass fetch and the weather fetch need the network.</strong> Both succeeded live in this
+  round; the artefacts are cached, and the scripts degrade to <code>NOT_RUN.md</code> rather than inventing data.</li>
+<li><strong>The OpenWeatherMap branch is implemented but was not exercised</strong> (no key).</li>
+<li><strong>No version control</strong>: <code>git</code> cannot run in this environment, so nothing is committed and all changes
+  live only in the working tree.</li>
+</ul>
+<hr />
+<h2 id="14-the-future-event-risk-model-a-real-supervised-prediction-trained-on-real-falls-2026-10-18">14. The future-event risk model: a real supervised prediction, trained on real falls (2026-10-18)</h2>
+<p>The one thing the brief asked for that this project had repeatedly, correctly <em>declined</em> to fake. Section
+13.4 said: <em>"no fabricated 'future-risk' model — no outcome labels exist"</em>. That statement was right about
+the four named datasets, and it stayed right. This round changed the <strong>dataset</strong>, not the honesty.</p>
+<h3 id="141-the-problem-restated">14.1 The problem, restated</h3>
+<p>GeoLife, UCI HAR, OpenStreetMap and OpenWeatherMap/Open-Meteo contain <strong>no injury, incident or danger
+outcome at all</strong>. A supervised tourist-incident model is therefore impossible from them, and manufacturing
+labels would be fabrication. Two honest options existed: ship nothing, or find a dataset with real outcome
+labels. This round did the latter, documented the swap, and re-checked §13.4's blunt claim about the
+dashboard.</p>
+<p><strong>The other real gap found this round:</strong> the authority backend had <strong>no table that could hold a
+prediction</strong>. It stored incidents (<code>events</code>) and an SOS workflow (<code>sos_alerts</code>), and the dashboard could
+therefore neither receive nor display a prediction even if one existed. That gap is now closed
+(§14.4).</p>
+<h3 id="142-the-dataset-and-what-was-found-in-it">14.2 The dataset, and what was found in it</h3>
+<p><strong>UniMiB SHAR</strong> (Micucci, Mobilio, Napoletano, 2017): 30 subjects, 9 activities of daily living and <strong>8
+real fall types</strong>, 50 Hz phone accelerometer. Downloaded here and verified by hash:
+266,206,080 bytes, SHA-256 <code>365a3967...67160</code>.</p>
+<ul>
+<li><strong>1,980 trials read, 1,979 used.</strong> Subject 10 / <code>Jumping</code> / trial 1 has <strong>9,369 of 9,624</strong> non-finite
+  values. It was <strong>dropped, counted and reported</strong> in <code>dataset_provenance.json</code> — not interpolated, not
+  mean-filled. A NaN in a feature vector would have poisoned every tree that touched it.</li>
+<li><strong>6 fall trials</strong> never reach the 2.0 g impact threshold and are excluded from the positives (counted).</li>
+<li><strong>No OSI licence exists</strong> for this dataset. The provenance file records
+  <code>{"osi_approved": false, "research_use_only": true}</code> plus the citation rather than inventing terms.
+  Only derived artefacts are redistributed — never the recordings.</li>
+</ul>
+<h3 id="143-the-target-the-horizon-and-the-leakage-proof">14.3 The target, the horizon, and the leakage proof</h3>
+<blockquote>
+<p><em>Given the last second of phone accelerometer data, will a hard fall impact land within the <strong>next</strong>
+second?</em></p>
+</blockquote>
+<ul>
+<li>Positive = a window ending 1..50 samples <strong>before</strong> a sample that is the trial's <code>argmax(magnitude)</code> and
+  is at least <strong>2.0 g</strong> (reusing the app's own <code>FallPolicy.MIN_IMPACT_G</code>). Negative = a window cut at the
+  same 0.2 s cadence from an <strong>ADL</strong> trial. Post-impact windows are a <strong>diagnostic</strong>, never training data.</li>
+<li>Horizon and feature window are both <strong>50 samples = 1.0 s</strong> — the <strong>longest fully supported</strong> horizon
+  (trials run 151–446 samples, impact around index ~120, leaving ≥95 pre-impact samples). A 30-minute
+  horizon is <strong>not attempted</strong>, and the docs say why.</li>
+<li><strong>Leakage is proved, not asserted.</strong> A window ending at <code>t</code> uses <code>[t-49, t]</code>; the label asks about
+  <code>(t, t+50]</code> — disjoint by construction. <code>train.check_no_future_information()</code> re-derives this from the
+  raw recordings on every run, and a <strong>shuffled-label control</strong> scores <strong>ROC-AUC 0.477</strong> (chance).</li>
+<li><strong>No fitted preprocessing at all</strong>: every feature is scale-free within its own window, so there is no
+  scaler that could carry a global mean from train into test.</li>
+<li>Subject-disjoint 60/20/20, seed 42 -&gt; <strong>18/6/6 subjects, disjoint: true</strong>, 51,128 windows (6,458
+  positive / 44,670 negative).</li>
+</ul>
+<h3 id="144-what-was-built">14.4 What was built</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml/future_risk/</code></td>
+<td><code>config.py</code> (selected hyper-parameters, the size budget, the 22-feature order), <code>features.py</code>, <code>dataset.py</code>, <code>train.py</code>, <code>tune.py</code></td>
+</tr>
+<tr>
+<td>Artefacts</td>
+<td><code>ml/outputs/future_risk/</code>: <code>windows.npz</code>, <code>dataset_provenance.json</code>, <code>metrics.json</code>, <code>tuning.json</code>, <code>calibration_reliability.csv</code>, <code>test_predictions.csv</code>, 6 figures, the model JSON and the reference cases — <strong>plus byte-identical copies</strong> into <code>app/src/main/assets/</code> and <code>app/src/test/resources/</code></td>
+</tr>
+<tr>
+<td>Android (on-device)</td>
+<td><code>FutureRiskFeatures</code> (22 features), <code>FutureRiskModel</code> (loader + Platt calibration + factor ranking), <code>FutureRiskAnalyzer</code> (bands, staleness, insufficient data), <code>FutureRiskReporter</code> (a throttled summary), <code>FutureRiskCardModel</code>/<code>FutureRiskCard</code>, wired through <code>MovementController</code> into <code>TrackingScreen</code></td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>a <code>RISK</code> payload kind with <strong>12 validation rejections</strong>, a new <code>risk_assessments</code> table, <code>/me.latestRisk</code>, <code>GET /authority/risk</code>, per-tourist history, and overview counts</td>
+</tr>
+<tr>
+<td>Dashboard</td>
+<td>a new <strong>"Future-risk predictions"</strong> panel, a <code>Risk (model)</code> column and a <code>RISK</code> feed filter — shown as <strong>predictions</strong>, never folded into the SOS queue or the incident feed</td>
+</tr>
+</tbody>
+</table>
+<p>Two deliberate engineering choices worth recording:</p>
+<ul>
+<li><strong>Reuse, no new dependency.</strong> Inference uses the app's <strong>existing</strong> <code>DecisionForest</code> JSON walker (the
+  only change is an optional <code>expectedFeatures</code> parameter so a 22-feature model loads without weakening
+  the existing 24-feature check). <strong>No ML framework, runtime or serialization format was added.</strong></li>
+<li><strong>One sensor subscription.</strong> The risk model is fed by the movement watch's existing accelerometer
+  stream — no second listener, no extra battery cost — and the tourist-facing prediction therefore works
+  <strong>fully offline</strong>.</li>
+</ul>
+<h3 id="145-model-selection-under-a-real-deployment-constraint">14.5 Model selection under a real deployment constraint</h3>
+<p><code>tune.py</code> searched <strong>65 configurations</strong> on the <strong>validation split only</strong>. The quality winner (300 trees,
+unbounded depth, validation PR-AUC <strong>0.875909</strong>) exports to <strong>20,059.7 KB</strong> and <strong>cannot ship to a phone</strong>.
+Only <strong>1 of 65</strong> configurations fits the 2,000,000-byte asset budget; the selected one (120 trees, depth
+11, leaf 4, validation PR-AUC <strong>0.845112</strong>) exports to <strong>1,968,314 bytes</strong> and ships at <strong>1,974,297</strong> with
+its metadata. The <strong>−0.031 PR-AUC cost is stated in the model card</strong>, and the selection rule is recorded in
+<code>tuning.json</code> and <strong>re-derived by a test</strong> rather than living in a document.</p>
+<h3 id="146-verification-for-this-round-all-measured">14.6 Verification for this round (all measured)</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Command</th>
+<th>Result (measured)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM suite</td>
+<td><code>:app:testDebugUnitTest --rerun</code></td>
+<td><strong>484 tests, 0 failures, 0 errors, 5 skipped</strong> across <strong>45 classes</strong> (94 new: 93 across 8 new classes + 1 live E2E)</td>
+</tr>
+<tr>
+<td>Backend rules (in-process)</td>
+<td><code>python -m pytest backend\tests -q</code></td>
+<td><strong>220 passed</strong> (was 192; +28 for <code>test_risk.py</code>)</td>
+</tr>
+<tr>
+<td>Backend acceptance (real subprocess)</td>
+<td><code>python backend\verify_integration.py</code></td>
+<td><strong>33/33 PASS</strong> (was 26/26; the batch now also carries a <code>RISK</code> summary, so the acceptance run proves a prediction reaches <code>/authority/risk</code> and raises no SOS)</td>
+</tr>
+<tr>
+<td>ML suite</td>
+<td><code>python -m pytest tests future_risk/tests -q</code> (from <code>ml/</code>)</td>
+<td><strong>179 passed</strong> (was 86; +93 for the new pipeline)</td>
+</tr>
+<tr>
+<td>Live client -&gt; real server</td>
+<td><code>AuthorityLiveBackendTest</code> with <code>-Dtsm.e2e.baseUrl=...</code></td>
+<td><strong>5/5 passed, 0 skipped</strong> (the new one pushes an on-device prediction and proves <code>sosTotal</code> does not move)</td>
+</tr>
+<tr>
+<td>APK build</td>
+<td><code>:app:assembleDebug</code></td>
+<td>BUILD SUCCESSFUL</td>
+</tr>
+</tbody>
+</table>
+<p>Held-out test numbers (10,415 windows, 6 unseen subjects, 1,339 positive): majority baseline PR-AUC
+0.128565 · logistic regression 0.659633 · <strong>hist gradient boosting 0.815000</strong> (better, <strong>not shippable
+on-device</strong>) · <strong>shipped forest 0.764569 PR-AUC / 0.936848 ROC-AUC</strong>, precision 0.6707, recall 0.7498,
+F1 0.7080 · <strong>trial sensitivity 0.929577</strong> (264 of 284 real falls flagged) · Brier 0.062600 -&gt; <strong>0.056675</strong>
+after Platt calibration fitted on validation only · <strong>shuffled-label control 0.477</strong>.</p>
+<p>APK <strong>19.48 MB</strong> (20,422,301 bytes), SHA-256
+<code>AF690EB209C408F202CD8EC9CAAA9FD1350C060AFC21AF7CDEF8706940CABDBA</code>, copied to the project root, <code>Desktop</code>
+and <code>Downloads</code> as <code>app-debug.apk</code>.</p>
+<h3 id="147-still-not-done-here-stated-not-hidden">14.7 Still not done here (stated, not hidden)</h3>
+<ul>
+<li><strong>No emulator or device.</strong> The <code>FutureRiskCard</code> on a real screen and the whole live chain
+  (sensor -&gt; window -&gt; 22 features -&gt; shipped forest -&gt; calibrated band) remain <strong>NOT EXECUTED</strong>
+  (INST-22, INST-23). The deployment <em>is</em> offline-safe by construction, and
+  <code>FutureRiskReferenceTest</code> proves the shipped asset agrees with scikit-learn, but that is not the same
+  as having watched it run on a phone.</li>
+<li><strong>The dashboard panel was never opened in a browser.</strong> <code>app.js</code> is syntax-checked with <code>node -e</code>; the
+  rows it renders come from <code>backend/tests/test_risk.py</code>, which asserts the API responses they are built from.</li>
+<li><strong>The model is not a deployment-ready alarm.</strong> 5.09 false alarms per minute of ordinary activity
+  (16.30/min at the raw stride), over-confident mid-range probabilities, lab data from 30 healthy adults,
+  a one-second horizon only, and an untested "dropped phone vs falling person" failure mode.</li>
+<li><strong>The four named datasets still cannot support a supervised incident model.</strong> Nothing here changes
+  that; the future-risk model uses a fifth dataset with real outcome labels, and says so everywhere.</li>
+</ul>
+<hr />
+<h2 id="15-self-service-tourist-registration-the-tourist-creates-their-own-account-2026-10-18">15. Self-service tourist registration: the tourist creates their own account (2026-10-18)</h2>
+<p>Until this round every tourist account had to be created <strong>by an officer</strong> at the dashboard, and the tourist
+then signed in with an id and a one-time password. That is the wrong shape for the thing being built: a
+tourist who installs the app, with nobody at a desk, could not use the service at all. This round adds the
+one journey that was missing — <strong>the tourist registers themselves</strong> — and makes the result show up on the
+authority's screen with no officer action.</p>
+<h3 id="151-what-register-had-to-mean">15.1 What "register" had to mean</h3>
+<p>Three constraints shaped the design:</p>
+<ul>
+<li>the Tourist ID is the account's permanent name and has to look like one (<code>TR-2026-00124</code>), and the
+  tourist has to be able to <strong>write it down</strong> — so it must be shown, and it must be copyable;</li>
+<li>it must be <strong>unique by construction</strong>, not by a client-side counter that two phones can race;</li>
+<li>the PIN is a credential: hashed like a password, never stored in the clear, never returned, never logged.</li>
+</ul>
+<h3 id="152-the-id-is-minted-by-the-database-not-the-client">15.2 The ID is minted by the database, not the client</h3>
+<p>A client-side counter is the classic bug here: two phones registering in the same second both compute
+"00124". The allocation instead happens in SQLite:</p>
+<ul>
+<li>a new table, <code>tourist_id_sequence (id INTEGER PRIMARY KEY AUTOINCREMENT, issued_at INTEGER NOT NULL)</code>,
+  where each registration inserts one row and reads back the number SQLite issued;</li>
+<li>the text id is <code>TR-&lt;current UTC year&gt;-&lt;5-digit zero-padded number&gt;</code>, and <code>tourists.id</code> is the <strong>primary
+  key</strong>, so even a text collision cannot create a duplicate — the code steps over to the next number;</li>
+<li>the counter is <strong>never reset</strong>, across years or restarts. The year is for a human to read, not a reset
+  boundary.</li>
+</ul>
+<p><code>backend/tests/test_registration.py</code> registers twelve tourists in a row and asserts twelve distinct ids; it
+also forces a collision and asserts the code moves to the next number rather than failing.</p>
+<h3 id="153-the-pin-is-the-credential-the-response-carries-no-secret">15.3 The PIN is the credential; the response carries no secret</h3>
+<p>The <code>tourists</code> table has <code>NOT NULL</code> <code>password_salt</code> / <code>password_hash</code> columns from the officer-created
+flow. Registration keeps that schema (no migration risk to existing rows) by writing a <strong>randomly generated
+secret that is immediately discarded</strong> into those columns; the account's real credential is the PIN, run
+through the project's existing scrypt <code>hash_password</code>. Neither the PIN, nor its salt, nor its digest is ever
+written to a response or a log — <code>test_registration.py</code> asserts the response contains the id and the
+account's public fields and nothing that looks like a secret, and <code>test_security.py</code>'s rule (no hash or salt
+leaves the server) is unchanged.</p>
+<p>The response to a successful registration is deliberately <strong>only</strong>:</p>
+<pre><code class="language-json">{&quot;tourist&quot;: {&quot;touristId&quot;: &quot;TR-2026-00124&quot;, &quot;displayName&quot;: &quot;…&quot;, &quot;phone&quot;: &quot;…&quot;,
+             &quot;registeredAtMillis&quot;: 1792305616556, &quot;registrationSource&quot;: &quot;SELF&quot;,
+             &quot;emergencyContactCount&quot;: 1},
+ &quot;note&quot;: &quot;Registration complete. Sign in with this Tourist ID and the PIN you chose. …&quot;,
+ &quot;serverTimeMillis&quot;: 1792305616556}
+</code></pre>
+<p>No token: <strong>registering does not sign you in.</strong> The tourist signs in as a separate step, exactly so the id
+on the success screen is something they must keep.</p>
+<h3 id="154-one-public-write-and-the-privilege-escalation-it-refuses">15.4 One public write, and the privilege escalation it refuses</h3>
+<p><code>POST /api/v1/auth/register</code> is the only new route and the only public <strong>write</strong>. It is fenced by reading
+as little as possible:</p>
+<ul>
+<li>it creates only <code>tourists</code> rows;</li>
+<li>it reads <strong>no privilege field</strong>. A body carrying <code>"role": "authority"</code> is refused with <code>400</code>, and there is
+  no field that could grant one — the escalation path does not exist rather than being blocked;</li>
+<li>it issues no session, so it cannot be used to obtain a token;</li>
+<li>it is idempotent <em>per person</em>, not per call: a phone number that is already registered is <code>409</code>.</li>
+</ul>
+<p>The validation is pure and lives in one place, <code>backend/tsm/registration.py</code>, reusing the existing
+<code>hash_password</code> (scrypt) and the same contacts validator the outbox uses
+(<code>payloads.normalise("CONTACTS", …)</code>), so a contact accepted here is a contact the sync path would accept.</p>
+<h3 id="155-the-app-register-get-the-id-sign-in">15.5 The app: register -&gt; get the id -&gt; sign in</h3>
+<p>The Authority screen's sign-in card now has two modes, deliberately separate — <em>Sign in</em> and <em>Register as
+tourist</em> — because one creates the account and the other uses it. Registering collects a name, a phone
+number, a chosen PIN and its confirmation, and any number of emergency contacts (added one at a time, each
+with a name, a number and an optional relationship; removable). The form is validated <strong>on the phone first</strong>
+so a mistyped confirmation is answered instantly instead of costing a round-trip; the server validates
+everything again and its <code>409</code> is shown as <em>"already registered"</em> rather than as a generic failure.</p>
+<p>On success the screen becomes a <strong>registration-success card</strong> showing the Tourist ID in a monospace readout
+with a <strong>Copy Tourist ID</strong> button, the account's name and phone, and a plain-language instruction on how to
+sign in next — including that the PIN is not shown again and that a forgotten PIN means an officer must
+reset it. <em>Continue to sign in</em> carries the id into the sign-in field and clears the PIN fields.</p>
+<p>New code: <code>authority/RegistrationForm.kt</code> (pure validation), <code>AuthorityContract.kt</code> / <code>AuthorityApi.kt</code> /
+<code>AuthorityClient.kt</code> (request and response codec), <code>AuthorityViewModel.kt</code> (the state machine and the
+"a later failure must not erase an id still being copied" rule), and <code>ui/screens/AuthorityScreen.kt</code> (the
+mode toggle, the form and the success card).</p>
+<h3 id="156-the-dashboard-registered-tourists-with-registration-separate-from-tracking">15.6 The dashboard: Registered Tourists, with registration separate from tracking</h3>
+<p><code>GET /api/v1/authority/tourists</code> was enriched (additively — nothing existing changed shape) and the
+dashboard's "Tourists" panel became <strong>"Registered Tourists"</strong>, driven from it. Each row now carries:</p>
+<p><code>touristId</code>, <code>displayName</code>, <code>phone</code>, <code>registeredAtMillis</code>, <strong><code>registrationStatus</code></strong>, <code>registrationSource</code>
+(<code>SELF</code> for an app registration, the officer's id for a desk account, <code>null</code> for older rows),
+<strong><code>trackingStatus</code></strong>, <code>lastSeenMillis</code>, <code>hasPosition</code>, <code>latestPosition</code>, <code>emergencyContactCount</code>,
+<code>openSosCount</code>, <code>latestRiskBand</code>, <code>latestRiskAtMillis</code>, <code>state</code>.</p>
+<p>The point of the split is that three different facts stay three different facts:</p>
+<ul>
+<li><strong>registration</strong> — <em>is this a real account?</em> (<code>REGISTERED</code>);</li>
+<li><strong>tracking</strong> — <em>have we heard from the phone?</em> (<code>AWAITING_FIRST_REPORT</code>, later <code>OK</code>/<code>STALE</code>);</li>
+<li><strong>safety</strong> — the open SOS count and the latest risk band, which were already there.</li>
+</ul>
+<p>A tourist who has registered but never reported reads <strong>"Location not yet available"</strong>; the panel never
+shows a position that does not exist. New registrations appear at the top of the list on the next refresh
+(the list is newest-first) with no officer action.</p>
+<h3 id="157-a-latent-bug-found-on-the-way">15.7 A latent bug found on the way</h3>
+<p>While adding the prediction's contract to the register, the <code>RISK</code> ingest was found to insert its
+<code>risk_assessments</code> row <strong>outside</strong> the <code>with db().write()</code> block that inserted its <code>events</code> row — so the
+prediction and its audit entry could commit separately. That is invisible in the happy path and wrong
+exactly when it matters (a crash between the two writes would leave a prediction with no audit trail). It
+now runs inside the same transaction. The prediction itself was unchanged.</p>
+<h3 id="158-verification-for-this-round-all-measured">15.8 Verification for this round (all measured)</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Command</th>
+<th>Result (measured)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM suite</td>
+<td><code>:app:testDebugUnitTest --rerun</code></td>
+<td><strong>515 tests, 0 failures, 0 errors, 6 skipped</strong> across <strong>47 classes</strong> (31 new/expanded: 13 <code>RegistrationFormTest</code> + 11 <code>AuthorityViewModelTest</code> + 4 <code>AuthorityApiTest</code> + 2 <code>AuthorityHttpServerTest</code> + 1 live E2E)</td>
+</tr>
+<tr>
+<td>Backend rules (in-process)</td>
+<td><code>python -m pytest backend\tests -q</code></td>
+<td><strong>265 passed</strong> (was 220; +45 for <code>test_registration.py</code>)</td>
+</tr>
+<tr>
+<td>Backend acceptance (real subprocess)</td>
+<td><code>python backend\verify_integration.py</code></td>
+<td><strong>41/41 PASS</strong> (was 33/33; +8: self-register, the id is minted, no token/secret, sign in with id + PIN, duplicate phone 409, role escalation 400, appears on the officer's register with no position, survives a restart)</td>
+</tr>
+<tr>
+<td>ML suite</td>
+<td><code>python -m pytest tests future_risk/tests -q</code> (from <code>ml/</code>)</td>
+<td><strong>179 passed</strong> (unchanged)</td>
+</tr>
+<tr>
+<td>Live client -&gt; real server</td>
+<td><code>AuthorityLiveBackendTest</code> with <code>-Dtsm.e2e.baseUrl=...</code></td>
+<td><strong>6/6 passed, 0 skipped</strong> — the new case registered <code>TR-2026-00001</code>, signed in with that id and the chosen PIN, read the row back from the officer's authenticated API, then delivered a real-GPS position and watched the row become <code>trackingStatus=OK</code>, <code>hasPosition=true</code></td>
+</tr>
+<tr>
+<td>APK build</td>
+<td><code>:app:assembleDebug</code></td>
+<td>BUILD SUCCESSFUL</td>
+</tr>
+</tbody>
+</table>
+<p>The live run logged the dashboard row before and after the report, which is the clearest evidence of the
+split:</p>
+<pre><code class="language-text">[e2e] registered TR-2026-00001 for +91 81792305616395
+[e2e] signed in as the freshly-registered TR-2026-00001
+[e2e] dashboard row after registration:  {… &quot;registrationStatus&quot;:&quot;REGISTERED&quot;,
+     &quot;registrationSource&quot;:&quot;SELF&quot;, &quot;trackingStatus&quot;:&quot;AWAITING_FIRST_REPORT&quot;,
+     &quot;hasPosition&quot;:false, &quot;latestPosition&quot;:null, &quot;state&quot;:&quot;STALE&quot; …}
+[e2e] dashboard row after a real report: {… &quot;registrationStatus&quot;:&quot;REGISTERED&quot;,
+     &quot;trackingStatus&quot;:&quot;OK&quot;, &quot;hasPosition&quot;:true,
+     &quot;latestPosition&quot;:{&quot;latitude&quot;:18.5204,&quot;longitude&quot;:73.8567,&quot;simulated&quot;:false}, &quot;state&quot;:&quot;OK&quot; …}
+</code></pre>
+<p>APK <strong>19.74 MB</strong> (20,701,949 bytes), SHA-256
+<code>564B1C726F8A5D6ECB16225949EAAA1D0F71C0EA1DA6D164B523F2A118DD470C</code>, copied to the project root, <code>Desktop</code>
+and <code>Downloads</code> as <code>TouristSafetyMonitoring-2026-10-18-self-registration-debug.apk</code>.</p>
+<h3 id="159-still-not-done-here-stated-not-hidden">15.9 Still not done here (stated, not hidden)</h3>
+<ul>
+<li><strong>The registration UI was never rendered on a screen</strong> (INST-24). The form logic is JVM-tested
+  (<code>RegistrationFormTest</code>, <code>AuthorityViewModelTest</code>), the wire format is real-socket-tested
+  (<code>AuthorityHttpServerTest</code>), and the whole journey runs through the <strong>production</strong> client against a real
+  server on the JVM (§7.1 of the test report) — but no Compose screen was drawn, because there is still no
+  emulator or device in this environment.</li>
+<li><strong>The dashboard panel was not opened in a browser.</strong> <code>app.js</code> is checked with <code>node --check</code> and its
+  inputs are asserted in <code>test_registration.py</code>, but <code>renderTourists</code> was not watched rendering real rows.</li>
+<li><strong>Nothing was committed.</strong> This project has no version control in this environment; every change lives in
+  the working tree.</li>
+<li><strong>The PIN is the only credential for a self-registered account.</strong> There is no self-service PIN reset
+  (by design — the PIN is irrecoverable, and the supported reset is an officer action), and no rate limiting
+  on the public registration route beyond the phone-number uniqueness check. Both are documented scope
+  lines rather than oversights.</li>
+</ul>
+<hr />
+<h1 id="16-round-two-role-sign-in-and-the-submit-button-that-was-dead-on-a-fresh-install">16. Round: two-role sign-in, and the submit button that was dead on a fresh install</h1>
+<h2 id="161-the-report">16.1 The report</h2>
+<p>A phone with a fresh install of the previous APK opened on the <strong>Authority</strong> screen showing <strong>NOT SIGNED
+IN</strong>, with <strong>Sign in with PIN</strong> and <strong>Create my account</strong> both greyed out. Nothing on the screen said why,
+and no Tourist ID was ever minted — so registration was, from the user's side, impossible.</p>
+<h2 id="162-the-root-cause-exactly">16.2 The root cause, exactly</h2>
+<p><code>AuthorityScreen.kt</code> enabled all three of <em>Save address</em>, <em>Sign in</em> and <em>Register</em> with</p>
+<pre><code class="language-kotlin">enabled = !busy &amp;&amp; address.isNotBlank()
+</code></pre>
+<p><code>address</code> was seeded from the stored session's <code>baseUrl</code>, which is <strong>empty on a fresh install</strong>. So the
+first thing a new user met was three dead buttons whose only requirement was a backend address that the app
+never asked for and never explained. It was not a registration bug, not a credential bug and not a network
+bug: the <strong>submission controls were gated on a field the tourist was never meant to fill in</strong>.</p>
+<p>Two structural problems fell out of the same design:</p>
+<ul>
+<li>the tourist's sign-in/registration and the <em>operator's</em> backend configuration lived on one screen; and</li>
+<li>the operator's screen was reachable from the tourist's path at all.</li>
+</ul>
+<h2 id="163-what-changed">16.3 What changed</h2>
+<ol>
+<li><strong>The gate moved to form validity.</strong> <code>RegistrationForm.fieldErrors(...)</code> reports a problem <strong>per
+   field</strong>; <code>RegistrationForm.outstanding(...)</code> lists only what is genuinely missing; the button is live
+   whenever a submission is not in flight. Pressing it with a bad form shows the named problems. <strong>No
+   submit control anywhere depends on a backend address.</strong></li>
+<li><strong>The address left the tourist's path.</strong> It now lives in <em>Settings → Backend connection (advanced)</em>,
+   where <strong>Test connection</strong> performs a real <code>GET /api/v1/health</code> — <em>Connected</em> is claimed only when
+   something actually answered, and an address with nothing behind it reports <em>Offline</em>.</li>
+<li><strong>A build-time default, seeded exactly once.</strong> <code>-PAUTHORITY_URL</code> (or <code>TSM_AUTHORITY_URL</code>, or
+   <code>AUTHORITY_URL=</code> in <code>local.properties</code>) becomes <code>BuildConfig.DEFAULT_AUTHORITY_URL</code>;
+   <code>AppContainer.start()</code> writes it through <code>seedBaseUrlIfUnset</code>, which is a no-op once an address exists.
+   This pass's APK carries <code>http://192.168.1.102:8080</code>, so a first launch on this machine's Wi-Fi is
+   already pointed at the server.</li>
+<li><strong>Two roles, two sessions.</strong> The app opens on a <strong>Welcome</strong> screen offering <em>I'm a tourist</em> and
+   <em>I'm an authority officer</em>; a returning tourist with a valid session is offered <em>Continue</em> above the
+   choices. Officer and tourist sessions are stored under <strong>separate keys</strong> in the same DataStore, so an
+   officer sign-in cannot make the phone behave like a tracked tourist and either sign-out leaves the other
+   alone. Both are restored on restart.</li>
+<li><strong>The boundary is the server's.</strong> The officer console reads <code>GET /api/v1/authority/tourists</code>, which
+   already required <code>require_auth("authority")</code>. Hiding a screen proves nothing, so the live test presents a
+   <strong>tourist</strong> token to that route and asserts <strong>403</strong>.</li>
+<li><strong>The backend configuration screen</strong> survived as the advanced/technical screen (address, connection
+   state, queue + <em>upload now</em>, tourist profile, PIN change, the authority's view of this phone), with
+   sign-in and registration removed from it.</li>
+</ol>
+<h2 id="164-a-refactor-with-a-reason">16.4 A refactor with a reason</h2>
+<p><code>DataStoreAuthoritySessionStore</code> took a <code>Context</code> only to derive a default <code>DataStore</code>, which made it
+untestable off-device. It now takes the <code>DataStore</code> directly, with <code>createAuthoritySessionStore(context)</code>
+as the production factory. That is what turns "the session survives a restart" and "the officer session is
+separate" from asserted-by-inspection into <strong>asserted</strong>: <code>AuthoritySessionStoreTest</code> drives a real
+<code>PreferenceDataStore</code> over a throw-away file on the plain JVM, with no Robolectric. The file's handle is
+released by joining the cancelled scope before a second store opens the same file — without that the test
+would be racy.</p>
+<h2 id="165-verification-for-this-round-all-measured">16.5 Verification for this round (all measured)</h2>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Command</th>
+<th>Result (measured)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM suite</td>
+<td><code>:app:testDebugUnitTest --rerun</code></td>
+<td><strong>545 tests, 0 failures, 0 errors, 7 skipped</strong> across <strong>49 classes</strong> (+30: 10 <code>OfficerViewModelTest</code>, 8 <code>AuthoritySessionStoreTest</code>, 5 <code>RegistrationFormTest</code>, 4 <code>AuthorityApiTest</code>, 2 <code>AuthorityHttpServerTest</code>, 1 live E2E)</td>
+</tr>
+<tr>
+<td>Backend rules (in-process)</td>
+<td><code>python -m pytest backend\tests -q</code></td>
+<td><strong>265 passed</strong> (unchanged — no backend file changed)</td>
+</tr>
+<tr>
+<td>Backend acceptance (real subprocess)</td>
+<td><code>python backend\verify_integration.py</code></td>
+<td><strong>41/41 PASS</strong> (unchanged)</td>
+</tr>
+<tr>
+<td>ML suite</td>
+<td><code>python -m pytest ml\tests ml\future_risk\tests -q</code></td>
+<td><strong>179 passed</strong> (unchanged)</td>
+</tr>
+<tr>
+<td>Live client -&gt; real server</td>
+<td><code>AuthorityLiveBackendTest</code> with <code>-Dtsm.e2e.baseUrl=http://127.0.0.1:8080</code></td>
+<td><strong>7/7 passed, 0 skipped</strong> — the new case signed in as an officer, read the register through the app's own console method (every row asserted to carry an id and both statuses, and to have a position only when it claims one), then presented a <strong>tourist</strong> token to the same route and received <strong>HTTP 403</strong></td>
+</tr>
+<tr>
+<td>APK build</td>
+<td><code>:app:assembleDebug -PAUTHORITY_URL=http://192.168.1.102:8080</code></td>
+<td>BUILD SUCCESSFUL — 17 dex entries; <code>192.168.1.102:8080</code> and <code>DEFAULT_AUTHORITY_URL</code> found together in <code>classes8.dex</code>. <strong>19.80 MB</strong> (20,759,379 bytes), SHA-256 <code>CBA40235472992A30AA51F56ED8839F24DBF71C3094D7D06B8A316C34FC2CD79</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="166-still-not-done-here-stated-not-hidden">16.6 Still not done here (stated, not hidden)</h2>
+<ul>
+<li><strong>The new screens were never rendered on a device</strong> (INST-24, INST-25): the Welcome role chooser, the
+  tourist sign-in / create-account screen with its success card and copy button, and the officer console.
+  Their logic is JVM-tested (49 classes), the register route is real-socket-tested in both directions, and
+  both client methods were driven against a real server on the JVM — but no Compose screen was drawn,
+  because there is still no emulator or device in this environment (<code>adb devices</code> is empty).</li>
+<li><strong>The 403 is proven at the client and server level, not from a device.</strong> The device's own
+  <code>HttpURLConnection</code> and its loopback/Wi-Fi routing remain unexercised (INST-21).</li>
+<li><strong>No rate limiting was added</strong> to the officer sign-in route. Officer ids are generated (not chosen) and
+  the modules are unique, so enumeration is not a practical attack, but a lockout after repeated failures
+  would still be an improvement.</li>
+<li><strong>Nothing was committed.</strong> There is no version control in this environment; every change lives in the
+  working tree.</li>
+</ul>
+<hr />
+<h1 id="17-round-the-phone-could-never-reach-the-authority-androids-cleartext-block-2026-10-18">17. Round: the phone could never reach the authority — Android's cleartext block (2026-10-18)</h1>
+<h2 id="171-the-report">17.1 The report</h2>
+<p>Two screenshots from a real phone, both taken on the phone itself, both showing a red banner:</p>
+<ul>
+<li><strong>Tourist sign-in:</strong> <em>"The authority at http://192.168.1.102:8080 is not answering. Check that the
+  server is running and that this phone is on the same Wi-Fi network."</em> — with the connection card reading
+  <strong>Status: Offline</strong>, <em>"No answer from http://192.168.1.102:8080."</em></li>
+<li><strong>Authority officer:</strong> <em>"Cannot reach http://192.168.1.102:8080: <strong>Cleartext HTTP traffic to
+  192.168.1.102 not permitted</strong>"</em>.</li>
+</ul>
+<p>The second banner is the tell: it is not a message this app writes. It is the wording Android itself uses
+when the <strong>platform refuses to send a plain-HTTP request</strong>.</p>
+<h2 id="172-the-root-cause-exactly">17.2 The root cause, exactly</h2>
+<ul>
+<li>The authority is the project's own server: plain HTTP on port 8080 over the LAN
+  (<code>http://192.168.1.102:8080</code>). There is no TLS.</li>
+<li>The app sends it with <code>HttpURLConnection</code> (<code>HttpUrlConnectionAuthorityHttp</code>), and the transport wraps any
+  <code>IOException</code> as <code>AuthorityCall.Unreachable</code>, whose message is shown verbatim as
+  <em>"Cannot reach <address>: <message>"</em>.</li>
+<li><strong>Android 9 (API 28) and later refuse cleartext HTTP by default</strong> for any app whose <code>targetSdk</code> is 28 or
+  higher. This app's <code>targetSdk</code> is <strong>35</strong>, and the manifest declared <strong>neither</strong>
+  <code>android:usesCleartextTraffic</code> <strong>nor</strong> <code>android:networkSecurityConfig</code>.</li>
+</ul>
+<p>So the request was killed by the network-security policy <em>before it reached the network</em>. The server was
+never asked, never answered, and never logged anything — which is exactly what the authority's own access
+log shows: across the whole session there is not one request from the phone's address, only the host's own
+browser on the dashboard. The tourist screen's "is not answering" is the same failure with the platform's
+message summarised away; the officer screen happened to print the raw sentence.</p>
+<p>This had been true since the first build. It is not a regression from the two-role round, and no amount of
+restarting <code>run.py</code> would ever have changed it.</p>
+<h2 id="173-the-fix">17.3 The fix</h2>
+<ol>
+<li><strong><code>app/src/main/res/xml/network_security_config.xml</code></strong> (new) — a <code>&lt;base-config
+   cleartextTrafficPermitted="true"&gt;</code> with the reasoning written down in the file, so the next reader does
+   not "harden" it back into a broken state. The file also says what to do if the authority ever gains TLS.</li>
+<li><strong><code>AndroidManifest.xml</code></strong> — the <code>&lt;application&gt;</code> now declares
+   <code>android:networkSecurityConfig="@xml/network_security_config"</code>.</li>
+<li><strong><code>NetworkSecurityConfigTest</code></strong> (new, 3 tests) — reads the shipped manifest and the profile and fails if
+   the manifest stops pointing at a profile, if the profile stops permitting cleartext, or if the manifest
+   re-blocks it with <code>usesCleartextTraffic="false"</code>. A build setting that silently disables the app's only
+   way to reach its backend deserves a test, not a comment.</li>
+</ol>
+<p>Nothing else changed: the address resolution, the tourist/officer sessions, the officer endpoint and the
+<code>require_auth("authority")</code> boundary from round 16 are untouched.</p>
+<h2 id="174-verification-for-this-round-all-measured">17.4 Verification for this round (all measured)</h2>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Command</th>
+<th>Result (measured)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM suite</td>
+<td><code>:app:testDebugUnitTest --rerun</code></td>
+<td><strong>548 tests, 0 failures, 0 errors, 7 skipped</strong> across <strong>50 classes</strong> (+3 <code>NetworkSecurityConfigTest</code>; the 7 skips are the opt-in live-backend tests)</td>
+</tr>
+<tr>
+<td>The shipped policy itself</td>
+<td><code>aapt2 dump xmltree</code> on the built APK</td>
+<td><code>&lt;application&gt;</code> carries <code>android:networkSecurityConfig(0x01010527)=@0x7f0c0002</code>, and <code>aapt2 dump resources</code> resolves <code>0x7f0c0002</code> to <code>res/xml/network_security_config.xml</code>, which contains <code>cleartextTrafficPermitted</code> — i.e. the fix is <strong>inside the artefact</strong>, not just the source</td>
+</tr>
+<tr>
+<td>Backend rules (in-process)</td>
+<td><code>python -m pytest backend\tests -q</code></td>
+<td><strong>265 passed</strong> (unchanged — no backend file changed)</td>
+</tr>
+<tr>
+<td>Backend acceptance</td>
+<td><code>python backend\verify_integration.py</code></td>
+<td><strong>41/41 PASS</strong> (unchanged)</td>
+</tr>
+<tr>
+<td>ML suite</td>
+<td><code>python -m pytest ml\tests ml\future_risk\tests -q</code></td>
+<td><strong>179 passed</strong> (unchanged)</td>
+</tr>
+<tr>
+<td>APK build</td>
+<td><code>:app:assembleDebug -PAUTHORITY_URL=http://192.168.1.102:8080</code></td>
+<td>BUILD SUCCESSFUL — 17 dex entries; <code>192.168.1.102:8080</code> still in <code>classes8.dex</code>. <strong>20.33 MB</strong> (21,317,914 bytes), SHA-256 <code>F0786379EC1917F9004E03F72E9317FB0C0F97B4B7D4BF9F312A911D3BE5D239</code> (copies re-published to the project root, Desktop and Downloads)</td>
+</tr>
+<tr>
+<td>Live client -&gt; real server</td>
+<td><code>AuthorityLiveBackendTest</code></td>
+<td><strong>NOT re-run this round</strong> — the backend was stopped at the user's request, so the seven opt-in cases skip (that is what <code>skipped="7"</code> above records). Their last measured result is round 16's <strong>7/7</strong>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="175-still-not-done-here-stated-not-hidden">17.5 Still not done here (stated, not hidden)</h2>
+<ul>
+<li><strong>The fix has not been seen working on the phone.</strong> The two screenshots are the first real-device evidence
+  this project has produced, and they show the <em>old</em> APK failing. Installing the new APK and watching the
+  banner clear is a manual, on-device step (INST-24/INST-25 remain NOT EXECUTED). What <em>is</em> proven is that
+  the artefact now contains the policy Android requires.</li>
+<li><strong>The old APK must be replaced.</strong> The phone still has the build without this change; the address it was
+  seeded with is retained by an in-place <code>adb install -r</code> because the debug signing key and package are
+  unchanged.</li>
+<li><strong>The server must be running for the phone to connect</strong>, and the phone must be on the same Wi-Fi. The
+  fix removes the <em>platform</em> block; it does not make the backend start itself. A Windows Firewall inbound
+  allow rule for <code>python.exe</code> already exists on this machine, so no firewall change was needed.</li>
+<li><strong>Nothing was committed.</strong> There is no version control in this environment; every change lives in the
+  working tree.</li>
+</ul></body></html>

@@ -1,0 +1,106 @@
+<!doctype html><html><head><meta charset='utf-8'><title>google_maps_setup</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="turning-on-the-real-google-map">Turning on the real Google Map</h1>
+<p>The app ships with <strong>two</strong> map surfaces and picks one automatically:</p>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Map used</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A Google Maps API key is configured <strong>and</strong> Google Play services are present</td>
+<td><strong>Google Maps</strong> (the "real" map)</td>
+</tr>
+<tr>
+<td>No key configured (the default), or Play services missing</td>
+<td>Built-in key-less map — <strong>CARTO Voyager</strong> by default, styled to look like the familiar Google/Apple street map</td>
+</tr>
+</tbody>
+</table>
+<p>Both paths draw the <strong>same</strong> zones as polygons (green / yellow / red), the live position, the
+breadcrumb trail, the draft polygon, and the <strong>distance-to-boundary pill</strong>. The only difference is <em>who
+supplies the tiles</em>.</p>
+<p>The key-less path is not one server: it tries <strong>three</strong> independent key-free providers in order —
+OpenStreetMap (default), Esri World Street Map, OpenTopoMap — and falls over to the next when one fails,
+remembering the last one that worked. OpenStreetMap is the canonical key-free source. (CARTO Voyager was
+tried and <strong>removed</strong>: it now serves a watermark instead of a map, so it is not offered.) The top-left
+provider caption (<code>OpenStreetMap ▸</code>) opens <strong>map diagnostics</strong>, including <strong>Check map servers</strong>, which
+probes each provider and reports <code>ok (host)</code> or the HTTP status.</p>
+<p>The code for the Google path is already in the app (<code>ui/components/SafetyMap.kt</code> →
+<code>GoogleSafetyMap</code>). To switch it on you only need an API key — no code changes.</p>
+<hr />
+<h2 id="1-get-a-free-key-about-5-minutes">1. Get a free key (about 5 minutes)</h2>
+<ol>
+<li>Open <a href="https://console.cloud.google.com/">https://console.cloud.google.com/</a> and sign in with any Google account.</li>
+<li>Create a project (top bar → project picker → <strong>New project</strong>). Name it e.g. <code>TouristSafety</code>.</li>
+<li>In the search bar type <strong>Maps SDK for Android</strong> and open it, then press <strong>Enable</strong>.</li>
+<li>Go to <strong>APIs &amp; Services → Credentials → Create credentials → API key</strong>.</li>
+<li>Copy the key. (Optional but recommended: <strong>Edit</strong> the key → <em>Application restrictions</em> →
+   <em>Android apps</em> → add your app's package name <code>com.touristsafety.app</code> and your signing SHA-1 so
+   nobody else can use your key.)</li>
+</ol>
+<blockquote>
+<p><strong>Billing:</strong> Google requires a billing account to be attached, but the Maps SDK for Android has a
+large free monthly credit, so a personal project normally costs nothing. Google shows the current
+numbers on the <strong>Maps SDK for Android → Pricing</strong> page.</p>
+</blockquote>
+<hr />
+<h2 id="2-give-the-key-to-the-app">2. Give the key to the app</h2>
+<p>The key is read at build time from <strong>exactly one</strong> of these places (never hard-coded in source,
+never committed):</p>
+<p><strong>Option A — <code>local.properties</code> (recommended).</strong> Add one line to
+<code>D:\TouristSafetyMonitoring-src\local.properties</code>:</p>
+<pre><code class="language-properties">MAPS_API_KEY=AIza...your-key-here
+</code></pre>
+<p><strong>Option B — a Gradle property on the command line:</strong></p>
+<pre><code class="language-powershell">.\gradlew.bat :app:assembleDebug -PMAPS_API_KEY=AIza...your-key-here
+</code></pre>
+<p>Both are wired in <code>app/build.gradle.kts</code> (<code>manifestPlaceholders["MAPS_API_KEY"]</code> →
+<code>AndroidManifest.xml</code> → <code>com.google.android.geo.API_KEY</code>).</p>
+<hr />
+<h2 id="3-rebuild-and-install">3. Rebuild and install</h2>
+<pre><code class="language-powershell">powershell -NoProfile -ExecutionPolicy Bypass -File &quot;.\build.ps1&quot; &quot;:app:assembleDebug&quot; &quot;--console=plain&quot;
+</code></pre>
+<p>The new APK is at <code>app\build\outputs\apk\debug\app-debug.apk</code>. Install it and open
+<strong>Create Geo-Fence</strong> — you should now see Google's own tiles, centred on your position, with the
+Google "my location" button.</p>
+<p>If you prefer, paste the key to the assistant and the APK will be rebuilt with it already in place
+(the key is only written to the git-ignored <code>local.properties</code>).</p>
+<hr />
+<h2 id="4-if-google-maps-still-shows-grey-tiles">4. If Google Maps still shows grey tiles</h2>
+<ul>
+<li><strong>"Google Play services are not available"</strong> → the phone/tablet has no Play services (some
+  emulators and non-Play devices). The app automatically falls back to the key-less map.</li>
+<li><strong>Grey grid with a Google logo</strong> → the key was rejected. Check that <strong>Maps SDK for Android</strong> is
+  enabled on the key's project and that any <em>Android app restriction</em> matches the installed build's
+  package name <strong>and</strong> signing certificate.</li>
+<li><strong>No internet</strong> → neither map can download tiles. The app keeps every geo-fencing feature working
+  and shows the queued/alerts state; only the basemap is blank.</li>
+</ul>
+<hr />
+<h2 id="5-why-the-key-less-map-used-to-look-blank">5. Why the key-less map used to look blank</h2>
+<p>The key-less map is drawn by this project's own code (<code>ui/components/OfflineOsmMap.kt</code>). It used to
+open at latitude/longitude <code>(0, 0)</code> — a point called <strong>Null Island</strong> in the middle of the Atlantic
+Ocean — because the Create screen did not tell it where the user was. Open-ocean tiles are a flat
+light-blue slab, which looked like "a blank map".</p>
+<p>The fix prefers, in order: the <strong>live GPS fix</strong> → the newest <strong>draft polygon vertex</strong> → a saved
+<strong>zone</strong> → the <strong>phone's last-known location</strong>. Only if all four are missing does it show a
+"Finding your location…" card. So the map now opens on your own area in both the Google and the
+OpenStreetMap paths.</p></body></html>

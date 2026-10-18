@@ -1,0 +1,13 @@
+# Tourist Safety Monitoring - ML / data-analysis module
+# Pinned to the versions that were actually installed and used for the
+# reproducible run recorded in the session log.
+#
+# Tested on Python 3.11.9 (Windows).
+numpy==2.4.4
+pandas==3.0.6
+scipy==1.17.1
+scikit-learn==1.8.0
+matplotlib==3.11.2
+pytest==9.1.1
+# joblib ships with scikit-learn; listed explicitly because we persist the model with it.
+joblib==1.5.3

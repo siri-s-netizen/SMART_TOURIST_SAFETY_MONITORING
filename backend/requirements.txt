@@ -1,0 +1,10 @@
+# Tourist Safety authority backend - runtime dependencies.
+#
+# The local development server (`python backend/run.py`) uses Flask's built-in development
+# server and needs Flask alone. It has no other third-party imports: persistence is stdlib
+# `sqlite3` and authentication is stdlib `hashlib`/`hmac`/`secrets`.
+#
+# `gunicorn` is the production WSGI server the Render web service is started with. It is
+# POSIX-only, so it is installed on the deploy host and never on a Windows checkout.
+Flask==3.1.3
+gunicorn==26.2.0

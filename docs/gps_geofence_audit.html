@@ -1,0 +1,216 @@
+<!doctype html><html><head><meta charset='utf-8'><title>gps_geofence_audit</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="gps-tracking-and-polygon-geofencing-source-audit">GPS tracking and polygon geofencing — source audit</h1>
+<p>Date: 2026-10-17
+Scope: <code>permission → location provider → updates → TrackingController → GeoFenceEngine → containment → Tracking screen</code></p>
+<p>This audit traces the complete chain in the existing code. It records <strong>what is proven to work</strong>,
+<strong>what is actually broken</strong>, and the evidence for each claim. No claim here is based on a device run:
+see "Device status" at the end.</p>
+<h2 id="1-the-chain-as-it-exists">1. The chain, as it exists</h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>File</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Manifest permissions</td>
+<td><code>app/src/main/AndroidManifest.xml</code></td>
+<td>Correct. <code>ACCESS_FINE_LOCATION</code> <strong>and</strong> <code>ACCESS_COARSE_LOCATION</code> (so "approximate only" is a legitimate grant), <code>FOREGROUND_SERVICE_LOCATION</code>, <code>foregroundServiceType="location"</code>, <code>POST_NOTIFICATIONS</code>.</td>
+</tr>
+<tr>
+<td>Permission model</td>
+<td><code>location/LocationPermissions.kt</code></td>
+<td>Correct. <code>hasForegroundLocation</code> accepts fine <strong>or</strong> coarse, so an approximate-only grant is not treated as a denial.</td>
+</tr>
+<tr>
+<td>Real provider</td>
+<td><code>location/FusedLocationSource.kt</code></td>
+<td>Correct shape. Cold <code>callbackFlow</code>, one <code>LocationCallback</code> per collection, removed in <code>awaitClose</code>; no fallback coordinate anywhere.</td>
+</tr>
+<tr>
+<td>Duplicate / cancelled updates</td>
+<td><code>FusedLocationSource</code> + <code>TrackingController.launchLocationCollection</code></td>
+<td>Correct. <code>start()</code> cancels the previous job before launching; <code>callbackFlow</code> + <code>awaitClose</code> makes a second subscription structurally impossible. Proven by <code>TrackingPipelineTest."starting twice opens exactly one location subscription"</code>.</td>
+</tr>
+<tr>
+<td>Coordinates reaching engine</td>
+<td><code>TrackingController.onReading</code></td>
+<td>Correct. Persists, then reads <strong>enabled zones fresh from the database</strong> each fix, then evaluates.</td>
+</tr>
+<tr>
+<td>Lat/lon order</td>
+<td><code>GeoPoint(latitude, longitude)</code>, <code>PolygonCodec.encode</code>, <code>MercatorProjection.toGeoPoint</code></td>
+<td>Consistent everywhere — no transposition found.</td>
+</tr>
+<tr>
+<td>Containment</td>
+<td><code>geofencing/PolygonGeometry.kt</code>, <code>PolygonContainmentService.kt</code></td>
+<td>Correct and well tested: ray casting is order-robust; the accuracy radius is used only to decide whether the test can be <em>trusted</em>, never as a stand-in for the outline.</td>
+</tr>
+<tr>
+<td>Hysteresis / sticky state</td>
+<td><code>geofencing/GeoFenceEngine.kt</code></td>
+<td>Correct. <code>BOUNDARY</code>/<code>UNCERTAIN</code> never flip membership, so a bad fix cannot fabricate an alert.</td>
+</tr>
+<tr>
+<td>State → UI</td>
+<td><code>TrackingSnapshot.zoneStatuses</code> → <code>TrackingScreen</code> "Containment right now"</td>
+<td>Wired, but <strong>invisible until a zone exists</strong>, and there is no way to see <em>why</em> a verdict was reached.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-root-causes-found">2. Root causes found</h2>
+<h3 id="rc-1-first-actual-root-cause-nothing-recovers-when-the-os-state-changes">RC-1 (first actual root cause) — nothing recovers when the OS state changes</h3>
+<p><code>ui/viewmodel/TrackingViewModel.kt:172-176</code>:</p>
+<pre><code class="language-kotlin">/** Called when the user returns from system settings and the permission state may have changed. */
+fun onResumed() {
+    if (!snapshot.value.isTracking) return
+    if (!settings.value.backgroundTrackingEnabled) return
+}
+</code></pre>
+<p>The function's documented job is to re-check permission/provider state on resume. Its body has <strong>no
+effect at all</strong> — both statements return early, and there is no assignment, no call and no state
+change. <code>grep</code> confirms it also has <strong>zero callers</strong> anywhere in the app, and <code>MainActivity</code> installs
+no lifecycle observer.</p>
+<p>Consequences, in the order a user hits them:</p>
+<ol>
+<li>The user taps <strong>Start tracking</strong> with location switched off. <code>TrackingController.start()</code> refuses
+   and records <code>LOCATION_DISABLED</code> (<code>TrackingController.kt:114-119</code>).</li>
+<li>The user switches location on and returns to the app. Nothing re-checks, so tracking stays dead
+   until the user works out that they must tap Start a second time.</li>
+<li>Same for the permission dialog: if the grant lands after the screen was recreated, or if the user
+   grants it from Settings, there is no recovery path.</li>
+<li>If permission is <strong>revoked</strong> while tracking, nothing stops the pipeline or tells the user.</li>
+</ol>
+<p>Also part of this defect: because a refused start sets <code>isTracking = false</code>, the snapshot cannot
+distinguish "the user never asked" from "the user asked and we could not start". The user's intent is
+lost, which is precisely why recovery is impossible.</p>
+<h3 id="rc-2-trackingviewmodel-reports-success-for-a-start-the-controller-refused">RC-2 — <code>TrackingViewModel</code> reports success for a start the controller refused</h3>
+<p><code>ui/viewmodel/TrackingViewModel.kt:121-125</code>:</p>
+<pre><code class="language-kotlin">trackingController.start(backgroundTracking = wantsBackground)
+if (wantsBackground) { backgroundControl.start() }
+_message.value = &quot;Tracking started.&quot;
+</code></pre>
+<p>"Tracking started." is shown <strong>unconditionally</strong>, including when <code>start()</code> bailed out because location
+services are off. The user is told tracking started while no fix will ever arrive. This is failure
+possibility #1 from the review ("GPS disabled, or no fresh location fix") being <em>misreported</em>.</p>
+<h3 id="rc-3-the-foreground-service-can-stop-itself-before-it-is-ever-commanded-to-start">RC-3 — the foreground service can stop itself before it is ever commanded to start</h3>
+<p><code>location/LocationTrackingService.kt:67-83</code>. <code>onCreate()</code> runs <strong>before</strong> <code>onStartCommand()</code>, and it
+collects <code>trackingController.snapshot</code>, a <code>StateFlow</code>. A <code>StateFlow</code> replays its current value to a new
+collector immediately. So:</p>
+<pre><code class="language-kotlin">statusJob = lifecycleScope.launch {
+    container.trackingController.snapshot.collect { snapshot -&gt;
+        if (!snapshot.isTracking) { stopSelf(); return@collect }
+        ...
+    }
+}
+</code></pre>
+<p>If the service is created at any moment when the controller is not yet tracking — the OS restarting it
+under <code>START_STICKY</code> after the process was killed, or any start that races ahead of
+<code>controller.start()</code> — the replayed <code>isTracking = false</code> makes <code>onCreate</code> call <code>stopSelf()</code> <em>before</em>
+<code>onStartCommand()</code> gets the chance to start tracking. The service silently dies and the pipeline never
+comes up.</p>
+<h3 id="rc-4-diagnostics-gap-item-6-the-pipe-is-invisible">RC-4 (diagnostics gap, item 6) — the pipe is invisible</h3>
+<p><code>FusedLocationSource</code> records <code>lastError</code>, including from <code>onLocationAvailability</code> ("the provider
+reports no usable location right now"). That value is <strong>never read by anything</strong>: it is not in the
+snapshot and not on any screen. So when a device reports "no usable location", the app shows only
+the generic "Waiting for GPS fix…" and the cause is unknowable from the UI. There is likewise no
+screen showing permission precision, the provider state, the fix age, the accuracy, the current
+coordinates <em>and</em> the per-zone geofence verdict with the tolerances that produced it.</p>
+<h2 id="3-what-is-not-broken-checked-with-evidence">3. What is NOT broken (checked, with evidence)</h2>
+<ul>
+<li>Polygon containment for valid polygons — inside / outside / on-edge / within tolerance / concave
+  notch / too-few-vertices / invalid coordinate are all covered by
+  <code>PolygonContainmentServiceTest</code> (13 tests) and pass.</li>
+<li>Duplicate subscriptions, single alert per crossing, uncertain fixes not fabricating alerts,
+  mid-session zone creation — covered by <code>TrackingPipelineTest</code> (13 tests) and pass.</li>
+<li>Lat/lon ordering and the metre-frame projection — <code>PolygonGeometryTest</code>, <code>MercatorProjectionTest</code>.</li>
+<li>Simulated coordinates can never appear as GPS: readings carry <code>LocationSource</code>, and
+  <code>TrackingPipelineTest."the gps pipeline only ever writes GPS rows"</code> asserts it.</li>
+</ul>
+<h2 id="4-fixes-applied">4. Fixes applied</h2>
+<p>Each fix is the smallest change that removes the cause; the existing UI, the stored polygons, the
+offline database and the architecture are untouched.</p>
+<h3 id="f-1-rc-1-the-app-now-recovers-when-the-os-state-changes">F-1 (RC-1) — the app now recovers when the OS state changes</h3>
+<ul>
+<li>New <code>location/TrackingRecovery.kt</code> — a <strong>pure</strong> rule, <code>trackingRecoveryFor(TrackingRecoveryInput)</code>,
+  returning <code>NONE</code> / <code>START</code> / <code>STOP</code> / <code>REQUEST_PERMISSION</code> / <code>WAIT_FOR_LOCATION</code>. Permission outranks
+  everything, then the device-wide location switch, then starting.</li>
+<li><code>tracking/TrackingSnapshot.kt</code> — new <code>trackingRequested</code> field. A start that is refused now records
+  <strong>the request</strong> as well as the refusal, so the obstacle can be re-checked later. <code>isTracking</code> keeps
+  its old meaning ("the pipeline is running"), so nothing that reads it changes behaviour.</li>
+<li><code>tracking/TrackingController.kt</code> — <code>start()</code> records the request <em>before</em> the location-service check;
+  <code>stop()</code> clears it.</li>
+<li><code>ui/viewmodel/TrackingViewModel.onResumed()</code> — implemented for real, and it now <strong>has a caller</strong>:
+  <code>TrackingScreen</code> installs a <code>LifecycleEventObserver</code> that fires on <code>ON_RESUME</code>. Returning from the
+  permission dialog or from Settings now re-evaluates the facts and honours the pending request. The
+  OS facts are passed in from the screen so the ViewModel still has no <code>Context</code>.</li>
+</ul>
+<h3 id="f-2-rc-2-the-app-no-longer-claims-a-start-that-did-not-happen">F-2 (RC-2) — the app no longer claims a start that did not happen</h3>
+<p><code>TrackingViewModel.startTracking</code> now reads back the resulting snapshot and reports the outcome:
+"Tracking started.", or an explicit "Tracking did not start: location is switched off on the device …"
+which also tells the user that returning to the screen will start it. A disabled GPS can no longer be
+presented as a working one.</p>
+<h3 id="f-3-rc-3-the-foreground-service-can-no-longer-stop-itself-before-it-starts">F-3 (RC-3) — the foreground service can no longer stop itself before it starts</h3>
+<p><code>location/LocationTrackingService.kt</code> gained a <code>commandReceived</code> flag set in <code>onStartCommand</code>. The
+"stop when the pipeline is idle" rule only fires once a command has actually arrived, so the replayed
+pre-start value from <code>onCreate</code> can no longer kill the service. The user-initiated stop path is
+unchanged.</p>
+<h3 id="f-4-rc-4-the-diagnostics-the-review-asked-for">F-4 (RC-4) — the diagnostics the review asked for</h3>
+<ul>
+<li><code>tracking/GeofenceDiagnostics.kt</code> — pure builder producing, per enabled zone, the containment verdict,
+  the remembered membership, the rendered status, the distance to the nearest edge, <strong>the hysteresis
+  margin that was actually in force</strong> (entry or exit), the fix accuracy and the accuracy ceiling; plus
+  the overall verdict and the zone that produced it. Every value is copied from the engine's own
+  <code>ZoneStatus</code> — nothing is recomputed.</li>
+<li><code>ui/components/TrackingDiagnosticsCard.kt</code> — renders it, with permission precision (precise /
+  approximate-only / not granted), the location-service switch, pipeline state, the provider's own
+  error string, the last fix's age and time, the coordinates, the accuracy and the fix count.</li>
+<li><code>TrackingSnapshot.providerError</code> — the provider's verbatim complaint, recorded by
+  <code>FusedLocationSource</code> and previously <strong>read by nothing</strong>, is now carried on the snapshot, refreshed on
+  every fix and preferred over the generic pipeline error in the GPS status.</li>
+</ul>
+<h2 id="5-verification">5. Verification</h2>
+<ul>
+<li><strong>Full Android JVM suite at the time of this audit: 307 tests, 0 failures, 0 errors, 0 skipped, across
+  29 classes</strong> (baseline before this round: 275 / 26). Counted from
+  <code>app/build/test-results/testDebugUnitTest/TEST-*.xml</code>. <em>(The count moves each round; the current total
+  after the future-risk round is 484 across 45 classes - see <code>docs/test_report.md</code>.)</em></li>
+<li><strong>32 of those tests are new</strong>, all passing:</li>
+<li><code>geofencing/GeofenceWalkthroughTest</code> (9) — successive real-location updates pushed through the real
+    engine: a 300 m drawn zone and a ten-step walk from 100 m outside to 40 m clear on the far side,
+    asserting the containment verdict, the sticky membership and the <strong>status the screen renders</strong> at
+    every step; exactly one ENTRY and one EXIT; an undecided (accuracy-straddling) fix fabricating
+    nothing; a zone narrower than the tolerance band never reading as inside; and a ±60 m fix at the
+    centre of a 100 m zone reading as undecided rather than "inside dangerous area".</li>
+<li><code>location/TrackingRecoveryTest</code> (12) — every branch of the recovery rule, including the exact case
+    that was broken: permission missing, then granted, then recovered.</li>
+<li><code>tracking/GeofenceDiagnosticsTest</code> (11) — the diagnostics report the engine's numbers verbatim,
+    distinguish "no zones" from "zones that could not be tested" from "no fix yet", name the correct
+    margin, and pick the zone that produced the banner.</li>
+<li><code>:app:assembleDebug</code> → BUILD SUCCESSFUL.</li>
+<li>Pre-existing geofence coverage still green: <code>PolygonContainmentServiceTest</code> 13, <code>PolygonGeometryTest</code>
+  22, <code>GeoFenceEngineTest</code> 17, <code>TrackingPipelineTest</code> 13, <code>GpsStatusTest</code> 15.</li>
+</ul>
+<h2 id="6-device-status-unchanged-and-it-matters">6. Device status (unchanged, and it matters)</h2>
+<p><strong>No physical Android device and no emulator were available.</strong> <code>adb devices</code> lists nothing. Every
+statement above is from reading the source and from JVM/Robolectric tests. Nothing in this document
+claims GPS was observed working on a phone.</p></body></html>

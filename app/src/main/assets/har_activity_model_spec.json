@@ -1,0 +1,155 @@
+{
+  "purpose": "On-device walking/running/still recognition from the phone accelerometer and gyroscope.",
+  "input": {
+    "window_samples": 128,
+    "sample_rate_hz": 50,
+    "window_seconds": 2.56,
+    "channels": [
+      "total_acc_x",
+      "total_acc_y",
+      "total_acc_z",
+      "gyro_x",
+      "gyro_y",
+      "gyro_z"
+    ]
+  },
+  "features": [
+    {
+      "name": "acc_mag_mean",
+      "formula": "mean(sqrt(ax^2+ay^2+az^2))",
+      "unit": "g"
+    },
+    {
+      "name": "acc_mag_std",
+      "formula": "std(sqrt(ax^2+ay^2+az^2))",
+      "unit": "g"
+    },
+    {
+      "name": "acc_mag_min",
+      "formula": "min(magnitude)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_mag_max",
+      "formula": "max(magnitude)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_mag_range",
+      "formula": "max(magnitude) - min(magnitude)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_mag_energy",
+      "formula": "mean(magnitude^2)",
+      "unit": "g^2"
+    },
+    {
+      "name": "acc_mag_peak_jerk",
+      "formula": "max(|diff(magnitude)|)",
+      "unit": "g/sample"
+    },
+    {
+      "name": "acc_mag_zcr",
+      "formula": "zero crossings of (magnitude - mean)",
+      "unit": "count"
+    },
+    {
+      "name": "acc_x_mean",
+      "formula": "mean(ax)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_y_mean",
+      "formula": "mean(ay)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_z_mean",
+      "formula": "mean(az)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_x_std",
+      "formula": "std(ax)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_y_std",
+      "formula": "std(ay)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_z_std",
+      "formula": "std(az)",
+      "unit": "g"
+    },
+    {
+      "name": "acc_xy_corr",
+      "formula": "corr(ax, ay)",
+      "unit": "-"
+    },
+    {
+      "name": "acc_xz_corr",
+      "formula": "corr(ax, az)",
+      "unit": "-"
+    },
+    {
+      "name": "acc_yz_corr",
+      "formula": "corr(ay, az)",
+      "unit": "-"
+    },
+    {
+      "name": "gyro_mag_mean",
+      "formula": "mean(sqrt(gx^2+gy^2+gz^2))",
+      "unit": "rad/s"
+    },
+    {
+      "name": "gyro_mag_std",
+      "formula": "std(gyroscope magnitude)",
+      "unit": "rad/s"
+    },
+    {
+      "name": "gyro_mag_max",
+      "formula": "max(gyroscope magnitude)",
+      "unit": "rad/s"
+    },
+    {
+      "name": "gyro_mag_energy",
+      "formula": "mean(gyroscope magnitude^2)",
+      "unit": "(rad/s)^2"
+    },
+    {
+      "name": "gyro_x_std",
+      "formula": "std(gx)",
+      "unit": "rad/s"
+    },
+    {
+      "name": "gyro_y_std",
+      "formula": "std(gy)",
+      "unit": "rad/s"
+    },
+    {
+      "name": "gyro_z_std",
+      "formula": "std(gz)",
+      "unit": "rad/s"
+    }
+  ],
+  "classes": [
+    "WALKING",
+    "WALKING_UPSTAIRS",
+    "WALKING_DOWNSTAIRS",
+    "SITTING",
+    "STANDING",
+    "LAYING"
+  ],
+  "forest_format": {
+    "feature": "index into features[]",
+    "threshold": "go left when value <= threshold, right otherwise",
+    "left/right": "child node indices, -1 is unused",
+    "value": "class counts at the node; a leaf's counts are summed over trees to vote"
+  },
+  "trained_on": "UCI HAR, 7352 train windows / 21 subjects; tested on 2947 windows / 9 disjoint subjects",
+  "accuracy": 0.835086528673227,
+  "macro_f1": 0.8332863949345272
+}

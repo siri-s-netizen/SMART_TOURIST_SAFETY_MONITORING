@@ -1,0 +1,216 @@
+:root {
+  --bg: #0f1720;
+  --panel: #17222e;
+  --panel-2: #1d2b39;
+  --line: #2b3d4f;
+  --text: #e6edf3;
+  --muted: #8fa3b5;
+  --accent: #3fa7ff;
+  --ok: #2ecc71;
+  --warn: #f4b942;
+  --bad: #ff5b5b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 20px 60px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+h1 { font-size: 20px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; }
+
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.error { color: var(--bad); }
+
+/* ------------------------------------------------------------------ sign-in */
+
+.signin {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 26px;
+}
+
+.signin label { display: block; margin: 14px 0 4px; font-size: 13px; color: var(--muted); }
+.signin input { width: 100%; }
+
+input, select {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font: inherit;
+}
+
+button {
+  background: var(--accent);
+  border: 0;
+  color: #04121f;
+  font: inherit;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+
+button:disabled { opacity: .5; cursor: default; }
+button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.signin button { width: 100%; margin-top: 20px; }
+
+/* ------------------------------------------------------------------ layout */
+
+main { max-width: 1240px; margin: 0 auto; }
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 22px 0 14px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+
+.actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.toggle { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+
+.banner {
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.banner.error { border-color: var(--bad); color: var(--bad); }
+
+/* ------------------------------------------------------------------ tiles */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.tile.bad { border-color: var(--bad); }
+.tile.warn { border-color: var(--warn); }
+.tile-value { font-size: 24px; font-weight: 700; }
+.tile.bad .tile-value { color: var(--bad); }
+.tile.warn .tile-value { color: var(--warn); }
+.tile-label { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+/* ------------------------------------------------------------------ panels */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+}
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  padding: 0 10px 8px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+td { padding: 10px 10px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+tr.row-open td { background: rgba(255, 91, 91, .07); }
+/* The contributing-factors cell: a short stack of one-line explanations, kept narrow so the table
+   stays scannable. */
+td.factors div { font-size: 12px; line-height: 1.35; max-width: 320px; }
+td.factors div + div { margin-top: 4px; }
+
+td.actions { white-space: nowrap; }
+td.actions input.note { width: 150px; margin-right: 6px; }
+a { color: var(--accent); }
+
+.empty { color: var(--muted); margin: 8px 0 0; }
+
+/* ------------------------------------------------------------------ pills */
+
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+.pill-ok { background: rgba(46, 204, 113, .16); color: var(--ok); }
+.pill-warn { background: rgba(244, 185, 66, .16); color: var(--warn); }
+.pill-bad { background: rgba(255, 91, 91, .18); color: var(--bad); }
+
+.badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.badge-sim { background: rgba(244, 185, 66, .18); color: var(--warn); }
+.badge-real { background: rgba(63, 167, 255, .16); color: var(--accent); }
+
+/* ------------------------------------------------------------------ zone management */
+
+details.zone-form { margin: 0 0 18px; }
+details.zone-form summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.zone-form .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.zone-form label {
+  display: block;
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.zone-form label + .grid { margin-top: 0; }
+.zone-form input, .zone-form select { width: 100%; }
+
+textarea {
+  width: 100%;
+  margin-top: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  resize: vertical;
+}
+
+td.actions button + button { margin-left: 6px; }
+

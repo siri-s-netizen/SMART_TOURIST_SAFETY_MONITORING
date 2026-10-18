@@ -1,0 +1,43 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+.kotlin/
+
+# ---------------------------------------------------------------------------
+# Repository hygiene for the public deployment.
+#
+# The ML datasets and generated outputs are ~3 GB (individual zips well above
+# GitHub's 100 MB file limit), and backend/var/ holds the local SQLite database
+# and generated development credentials. None of it may be pushed.
+# The ML *source* (ml/*.py, ml/future_risk/, ml/models/) is still tracked.
+# ---------------------------------------------------------------------------
+/ml/data/
+/ml/outputs/
+/ml/.pytest_cache/
+/backend/var/
+/backend/.pytest_cache/
+/app/build/
+/.pytest_cache/
+__pycache__/
+*.pyc
+*.db
+*.db-wal
+*.db-shm
+e2e_credentials.txt
+

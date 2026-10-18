@@ -1,0 +1,1415 @@
+<!doctype html><html><head><meta charset='utf-8'><title>final_project_report</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="tourist-safety-monitoring-system-final-technical-report">Tourist Safety Monitoring System — Final Technical Report</h1>
+<p>Repository: <code>D:\TouristSafetyMonitoring-src</code> (Android · Kotlin · Jetpack Compose · Room)
+Report date: 2026-10-16 (revised 2026-10-17 — see §7.7–§7.9, §8 and §12; revised 2026-10-18 — see §7.10, §7.11 and §7.12)
+Status: <strong>buildable and tested on the JVM; on-device items are honestly marked NOT EXECUTED</strong></p>
+<hr />
+<h2 id="1-executive-summary">1. Executive summary</h2>
+<p>This pass fixed two real defects, added three new capabilities, and produced a reproducible
+data-analysis/machine-learning module plus full documentation — <strong>without inventing a backend, a
+dataset, model metrics, or test results.</strong> A later pass (2026-10-17) added real supervised models, the
+approach-risk briefing, and the crash fix for the reported "app closes by itself" (see §7.7–§7.9). A
+final pass (2026-10-18) added the one model the brief actually asked for and the project did not yet
+have: a <strong>genuine supervised future-event predictor</strong> (§7.10), trained on real recorded falls and run
+on-device. A further pass the same day added <strong>self-service tourist registration</strong> (§7.11): a tourist
+creates their own account from the phone, the service mints the Tourist ID, and the new account appears on
+the authority's dashboard with no officer action. The last pass (§7.12) fixed the reported dead submit
+buttons on a fresh install and split the app into <strong>two roles</strong> — a tourist journey and a separate,
+server-enforced <strong>officer console</strong> — with the backend address moved out of the tourist's path.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Deliverable</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Key-less map</strong> — the Create Geo-Fence screen is usable with no Google Maps key (three independent key-free tile providers: OpenStreetMap and its mirrors, Esri World Imagery, OpenTopoMap; OSM is the default)</td>
+<td>Implemented; projection + provider policy + offline tile cache + placeholder detection unit-tested; on-device tile rendering NOT EXECUTED</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Truthful background-service status</strong> — Home now reports the <em>real</em> service state (RUNNING / PAUSED / OFF)</td>
+<td>Implemented and driven by the real service lifecycle</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Offline outbox + transport</strong> — events are queued durably and retried; no fake delivery</td>
+<td>Implemented; a <strong>real HTTP transport</strong> delivers to the authority backend, or stays honest when no address is configured; 8 queue + 10 payload tests pass</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Simulated smartwatch</strong> — SAFE/WARNING/SOS, location, latest alert, vibration, SOS button, honest delivery status</td>
+<td>Implemented; 10 tests pass; vibration NOT EXECUTED (no device)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>ML / EDA pipeline</strong> — real GeoLife data, unsupervised trajectory-anomaly scoring, model card</td>
+<td>Implemented; real measured metrics</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Tests &amp; docs</strong></td>
+<td><strong>548</strong> JVM tests pass (541 + 7 opt-in skips), <strong>265</strong> authority-backend tests, <strong>41/41</strong> integration checks, <strong>179</strong> ML tests pass, 10 technical documents</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Multiple areas + live follow</strong> — tap-to-create sample zones, camera follows the newest fix</td>
+<td>Implemented; geometry unit-tested (6 tests); UI wiring NOT EXECUTED</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Map usability bug-fix round</strong> — visible blue "you are here" marker, closer default zoom, typed lat/long corners, crash log, bounded tile memory</td>
+<td>Implemented; unit tests pass; marker/zoom/dialog NOT EXECUTED on a device</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Crash fix</strong> — the reported "blue marker appears, then the app closes" (<code>CameraUpdateFactory is not initialized</code>)</td>
+<td>Root cause identified, guards + <code>runCatching</code> added; compile/JVM-verified, device confirmation <strong>NOT EXECUTED</strong> (INST-16)</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>Movement recognition + impact detection</strong> — two supervised random forests trained on real UCI HAR data, exported to JSON, walked on-device in Kotlin (no TFLite)</td>
+<td>Implemented; activity accuracy <strong>0.8351</strong> / macro-F1 0.8333; impact detector ROC-AUC 0.9999 vs shuffled control 0.5198; export verified in Python <strong>and</strong> Kotlin</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>Historical risk analysis on approach</strong> — a briefing shown within 200 m of a restricted/dangerous zone, with every risk factor itemised</td>
+<td>Implemented; 26 unit tests; explicitly a published weighted checklist, <strong>not</strong> a learned probability</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>Tracking UI</strong> — movement/fall card and approach-briefing card, plus a distance-to-boundary pill over the map</td>
+<td>Implemented; state maths unit-tested, rendering NOT EXECUTED</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>Authority backend + operator dashboard</strong> — one Flask app + SQLite: <strong>self-service tourist registration</strong>, tourist login (password or PIN), <code>POST /sync/events</code> with a per-event verdict (idempotent by <code>dedupeKey</code>), emergency contacts, and a dashboard with a <strong>Registered Tourists</strong> register and the SOS queue</td>
+<td>Implemented; <strong>265</strong> backend rule tests + <strong>41/41</strong> real-subprocess acceptance; the production Kotlin client reached it <strong>7/7</strong> live; the device's own path is NOT EXECUTED (INST-20/21/24)</td>
+</tr>
+<tr>
+<td>14</td>
+<td><strong>Real transport wired into the app</strong> — a transport selector + a dedicated session store + Authority and Emergency-contacts screens replace the hard-coded honest stub</td>
+<td>Implemented; <strong>51</strong> client/transport/real-socket tests pass; screen rendering NOT EXECUTED on a device</td>
+</tr>
+<tr>
+<td>15</td>
+<td><strong>Routine position reporting (offline location sync)</strong> — real-GPS fixes are queued as <code>POSITION</code> events behind an explicit interval/distance policy and delivered like any other event, so the authority's map tracks the tourist between alerts</td>
+<td>Implemented; <strong>12</strong> new tests (reporter + policy) plus payload tests; simulated/out-of-range fixes are refused; device GPS NOT EXECUTED</td>
+</tr>
+<tr>
+<td>16</td>
+<td><strong>Tourist PIN + SOS acknowledgement + status indicators</strong> — id + PIN sign-in (scrypt-hashed server-side), <code>PUT /me/pin</code>, the tourist seeing their SOS acknowledged, plus real GPS/authority status cards and responsive action/chip rows</td>
+<td>Implemented; <strong>18</strong> backend PIN tests + app-side PIN/position payload tests; live-verified (the suite has since grown — see item 19); on-device rendering NOT EXECUTED</td>
+</tr>
+<tr>
+<td>17</td>
+<td><strong>Remaining EDA / history / model work</strong> — real OpenStreetMap EDA (Overpass), real weather EDA (Open-Meteo), the UCI HAR figure set, historical trajectory + zone-crossing trends, and a supervised transport-mode model</td>
+<td>Implemented as reproducible scripts; <strong>86</strong> ML tests pass</td>
+</tr>
+<tr>
+<td>18</td>
+<td><strong>Genuine future-event risk prediction</strong> — a supervised random forest over <strong>real recorded falls</strong> (UniMiB SHAR), predicting a hard impact <strong>within the next second</strong>, calibrated, run <strong>on-device</strong>, shown to the tourist with its contributing factors and shared with the authority as a labelled prediction</td>
+<td>Implemented; PR-AUC <strong>0.764569</strong>, trial sensitivity <strong>0.929577</strong>, shuffled-label control <strong>0.477</strong>; <strong>94</strong> new JVM tests + <strong>93</strong> new ML tests + <strong>28</strong> backend tests; <strong>not a deployment-ready alarm</strong> (5.09 false alarms/min) and <strong>never triggers an SOS</strong>; on-device rendering NOT EXECUTED</td>
+</tr>
+<tr>
+<td>19</td>
+<td><strong>Self-service tourist registration</strong> — a tourist with no credential creates their own account from the phone (name, phone, a PIN they choose, optional emergency contacts); the <strong>database</strong> mints a unique <code>TR-&lt;year&gt;-&lt;n&gt;</code> Tourist ID; the success screen shows it with a <strong>copy</strong> button and sign-in instructions; signing in uses that id and PIN; the account appears under <strong>Registered Tourists</strong> on the dashboard with <strong>registration</strong>, <strong>tracking</strong> and the safety signals kept separate</td>
+<td>Implemented; <strong>45</strong> backend tests + <strong>24</strong> new JVM tests + <strong>1</strong> new live E2E; the live run minted <code>TR-2026-00001</code> and read the dashboard row back; the registration <strong>screen</strong> is NOT EXECUTED (INST-24)</td>
+</tr>
+<tr>
+<td>20</td>
+<td><strong>Two-role sign-in, and the dead-button fix</strong> — the app now opens on a <strong>Welcome</strong> screen offering <em>I'm a tourist</em> and <em>I'm an authority officer</em>; the tourist path leads to one combined <strong>sign-in / create-account</strong> screen (never gated on a backend address), the officer path to an <strong>officer console</strong> listing the register. The submit controls are gated on <strong>form validity</strong> with per-field messages and a <em>"still needed"</em> line, so nothing is ever silently greyed out. The tourist and officer sessions are stored under <strong>separate keys</strong> and are independent; the officer route is enforced <strong>server-side</strong> (a tourist token gets <strong>403</strong>). The address moves out of the tourist journey into <em>Settings → Backend connection (advanced)</em>, where <strong>Test connection</strong> really calls <code>/api/v1/health</code>, and a debug build can carry a first-launch default address that never overwrites a chosen one</td>
+<td>Implemented; <strong>+2</strong> JVM classes and <strong>+30</strong> JVM cases (<strong>49</strong> classes / <strong>545</strong> cases at that point; now <strong>50 / 548</strong> after deliverable 21), <strong>0</strong> failures; the live client signed in as an officer, read the register and was refused the same route with a tourist token; the <strong>Welcome</strong>, <strong>sign-in</strong> and <strong>officer console</strong> screens are NOT EXECUTED (INST-24/25)</td>
+</tr>
+<tr>
+<td>21</td>
+<td><strong>The phone could not reach the authority: Android's cleartext block</strong> — the app talks to a <strong>plain-HTTP</strong> LAN authority, and since Android 9 (API 28) the platform refuses cleartext HTTP for any app targeting 28+ unless the app opts in. With <code>targetSdk 35</code> and no profile, <strong>every</strong> call died in <code>Cleartext HTTP traffic to 192.168.1.102 not permitted</code> before a byte left the phone — which the sign-in screens could only report as "the authority is not answering". A <code>network_security_config.xml</code> now permits cleartext for the LAN authority, the manifest declares it, and a test fails the build if the pair ever drifts</td>
+<td>Implemented; the fix is <strong>inside the built APK</strong> (<code>aapt2 dump xmltree</code> shows <code>android:networkSecurityConfig</code>, and the referenced <code>res/xml/network_security_config.xml</code> carries <code>cleartextTrafficPermitted</code>); <strong>+3</strong> JVM cases (<strong>548</strong> total); whether the banner clears is NOT EXECUTED (needs the phone)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Headline numbers (all measured here):</strong> Android JVM tests <strong>548 / 541 pass, 7 opt-in skips</strong>; authority
+backend <strong>265</strong> tests + <strong>41/41</strong> acceptance checks; ML tests <strong>179 / 179 pass</strong>; debug APK builds
+(<strong>20.33 MB</strong>, SHA-256 <code>F0786379…3BE5D239</code>); GeoLife <strong>18,670 trajectories /
+24,876,978 points</strong> scanned with <strong>0 malformed rows</strong>; trajectory-anomaly injection ROC-AUC <strong>0.8922</strong>
+(shuffled control <strong>0.5007</strong>); UCI HAR activity accuracy <strong>0.8351</strong> on 2947 held-out windows from 9
+unseen subjects; impact-detector ROC-AUC <strong>0.9999</strong> on <strong>synthesised</strong> impacts (shuffled control
+<strong>0.5198</strong>) — the caveat matters and is stated in full in <code>docs/model_card_movement.md</code>; future-risk model
+PR-AUC <strong>0.764569</strong> / ROC-AUC <strong>0.936848</strong> on 10,415 windows from 6 unseen subjects, <strong>264 of 284</strong> real
+held-out falls flagged (shuffled control <strong>0.477</strong>) — the false-alarm rate and the lab-data caveat are
+stated in full in <code>docs/future_risk_prediction.md</code>.</p>
+<hr />
+<h2 id="2-what-was-wrong-diagnosis">2. What was wrong (diagnosis)</h2>
+<h3 id="21-the-create-geo-fence-map-was-blank-with-no-google-key">2.1 The Create Geo-Fence map was blank with no Google key</h3>
+<p><code>ui/components/SafetyMap.kt</code> gated the entire map on <code>mapsApiKeyConfigured</code>
+(<code>BuildConfig.MAPS_API_KEY</code> non-blank). With no key it rendered a "missing key" notice <strong>instead of a
+map</strong>, so taps never reached <code>onMapClick</code>, no vertices could be added, "Close ring" stayed disabled,
+and zones could not be saved. The key plumbing itself was correct; only the <em>no-key</em> path was broken.</p>
+<h3 id="22-home-contradicted-itself-tracking-active-but-background-service-not-running">2.2 Home contradicted itself: "Tracking: Active" but "Background service: Not running"</h3>
+<p><code>HomeScreen.kt</code> printed <code>snapshot.backgroundTracking</code>, which is only the <em>intent</em> flag set by
+<code>TrackingController.start(backgroundTracking = …)</code>. It never reflected whether
+<code>LocationTrackingService</code> was actually alive, and it conflated three distinct states (tracking on /
+service on / service wanted-but-blocked).</p>
+<h3 id="23-no-delivery-path-for-alerts-or-sos">2.3 No delivery path for alerts or SOS</h3>
+<p>There was no persistence for outbound events and no transport, so an alert or SOS generated while
+offline had nowhere to go. There was also <strong>no backend server in this repository</strong> — that gap is now
+closed: <code>backend/</code> is a working Flask + SQLite service with an operator dashboard, and the app has a real
+transport wired to it (deliverable 13 and 14 below, and <code>docs/progress_log.md</code> §12).</p>
+<hr />
+<h2 id="3-deliverable-1-key-less-map-openstreetmap-fallback">3. Deliverable 1 — Key-less map (OpenStreetMap fallback)</h2>
+<p><strong>Design.</strong> When a Google Maps key is present, the app uses Google Maps exactly as before. When it
+is absent, <code>SafetyMap.kt</code> renders <code>OfflineOsmMap</code>, a self-contained Compose canvas that:</p>
+<ul>
+<li>fetches standard OpenStreetMap raster tiles;</li>
+<li>projects lat/lon to screen with a pure, unit-tested <code>MercatorProjection</code> (integer zoom levels so
+  tiles and geometry align exactly);</li>
+<li>supports pan/zoom/tap gestures and the same tap-to-add-vertex flow;</li>
+<li><strong>degrades to a graticule grid</strong> if tiles cannot be fetched (offline), so the screen is <strong>never
+  blank</strong> and zones can still be drawn and saved.</li>
+</ul>
+<p><strong>Honesty.</strong> The projection maths is proven by <code>MercatorProjectionTest</code> (11 tests: known slippy-map
+tile indices, screen↔world round-trips, ground resolution at the equator, latitude clamping,
+panning). <strong>Whether tiles visually load is NOT EXECUTED</strong> — this environment has no device/emulator
+and no way to observe rendering. Do not treat the map as device-verified.</p>
+<p>Files: <code>ui/map/MercatorProjection.kt</code> (new), <code>ui/components/OfflineOsmMap.kt</code> (new),
+<code>ui/components/SafetyMap.kt</code> (modified).</p>
+<h3 id="31-usability-round-after-real-device-feedback-2026-10-17">3.1 Usability round after real-device feedback (2026-10-17)</h3>
+<p>Four defects reported from a phone, each traced to a concrete cause:</p>
+<table>
+<thead>
+<tr>
+<th>Report</th>
+<th>Cause found</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"the blue mark is not visible"</td>
+<td><code>UserMarkerAccent</code> was <code>0xFF0B6E4F</code> — the theme's <strong>dark green</strong>, and <code>SafeStroke</code> is <code>0xFF1B7F4C</code>, so the "you are here" dot matched a <strong>SAFE zone's fill</strong></td>
+<td>Marker colour changed to the conventional blue <code>0xFF1A73E8</code> with a dark outline and white collar; a <strong>hollow grey</strong> ring marks a last-known-only position; a status line states whether a live fix exists</td>
+</tr>
+<tr>
+<td>"in seconds app closed automatically"</td>
+<td>Not reproducible here (no device, empty <code>adb devices</code>). Two real memory paths removed: a coroutine per tile <strong>per camera change</strong>, and an in-memory tile map that was <strong>never pruned</strong></td>
+<td>140 ms de-bounce, batches of 4, off-screen tiles dropped, <code>LruCache</code> sized in bytes, providers skipped once dead (<code>TilePolicy.providersToTry</code>); <strong>plus</strong> a crash log + on-launch dialog so the real cause can be identified (<code>diagnostics/CrashLog.kt</code>)</td>
+</tr>
+<tr>
+<td>"the map view shld be close not that wide"</td>
+<td>Default zoom was 15 — about a town on one screen, so a tapped-out boundary was far larger than intended</td>
+<td>Default zoom 15 → <strong>17</strong>; editor map 280 → 320 dp; already-saved zones are drawn behind the draft</td>
+</tr>
+<tr>
+<td>"need 2 time in manual entry and latitute and logitude entry"</td>
+<td>A refused tap was <strong>silent</strong>, and there was <strong>no</strong> coordinate entry at all</td>
+<td>Refusals now explain themselves; a Latitude/Longitude row with <strong>Add point</strong> and <strong>Fill from my position</strong> was added (the fill button is what makes southern/western signs workable, since a phone's decimal keypad has no minus)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Honesty.</strong> All four are <strong>logic-verified, rendering NOT EXECUTED</strong>: the crash diagnosis is explicitly a
+plausible-cause fix plus instrumentation, not a confirmed root cause, and the marker/zoom/dialog can only
+be judged on a phone.</p>
+<p><strong>Follow-up (later on 2026-10-17) — the crash was then root-caused.</strong> The crash log added above did its
+job: the in-app dialog captured</p>
+<pre><code>java.lang.NullPointerException: CameraUpdateFactory is not initialized
+  at com.google.android.gms.maps.CameraUpdateFactory.newLatLng
+  at com.touristsafety.app.ui.components.SafetyMapKt$FollowLatestFix$1$1.invokeSuspend(SafetyMap.kt:99)
+</code></pre>
+<p>so "in seconds app closed automatically" was <strong>not</strong> a memory problem: with no Google Maps key the
+Play Services map SDK is never initialised, but the live-follow effect still called
+<code>CameraUpdateFactory.newLatLng</code> on every fix — which is exactly why it crashed the moment the blue
+marker first appeared. Fixed with a <code>googleCameraReady</code> guard plus <code>runCatching</code> in <code>followLatestFix</code>,
+<code>moveTo</code> and <code>fitPoints</code> (and an early return on degenerate bounds). Compile- and JVM-verified;
+confirming the <em>reported</em> crash is gone needs a device, so it is recorded as <strong>INST-16 NOT EXECUTED</strong>.</p>
+<hr />
+<h2 id="4-deliverable-2-truthful-background-service-status">4. Deliverable 2 — Truthful background-service status</h2>
+<p><strong>Design.</strong> <code>LocationTrackingService</code> sets a real flag only after <code>startForeground()</code> succeeds and
+clears it in <code>onDestroy()</code>. <code>TrackingController</code> exposes that flag. <code>HomeViewModel</code> maps the three
+real-world states to an explicit <code>BackgroundServiceStatus</code>:</p>
+<ul>
+<li><strong>RUNNING</strong> — the foreground service is genuinely alive;</li>
+<li><strong>PAUSED</strong> — background tracking was requested but the OS never granted background location;</li>
+<li><strong>OFF</strong> — not requested.</li>
+</ul>
+<p>Home now shows the truth, resolving the self-contradiction.</p>
+<p>Files: <code>tracking/TrackingController.kt</code>, <code>tracking/LocationTrackingService.kt</code>,
+<code>ui/viewmodel/HomeViewModel.kt</code>, <code>ui/screens/HomeScreen.kt</code> (all modified).</p>
+<hr />
+<h2 id="5-deliverable-3-offline-outbox-pluggable-transport">5. Deliverable 3 — Offline outbox + pluggable transport</h2>
+<p><strong>Design.</strong> Every alert/SOS is written to a durable local <strong>outbox</strong> first, then handed to a
+<code>SyncTransport</code>.</p>
+<ul>
+<li><strong>Durable:</strong> table <code>outbox_events</code>, added by an additive migration (<code>MIGRATION_1_2</code>); existing
+  zones and history are <strong>not</strong> erased.</li>
+<li><strong>Exactly-once semantics on the client:</strong> idempotent enqueue on a stable dedupe key; delivered
+  rows leave the pending queue; permanent rejections are marked failed; transient failures stay
+  pending and increment the attempt count.</li>
+<li><strong>Honest transport, now real:</strong> <code>SyncTransport</code> is an interface. The shipped <code>SelectingSyncTransport</code>
+  delegates to the real HTTP authority transport when a base URL is configured and to
+  <code>NoBackendTransport</code> (which returns <code>Retry</code>) otherwise. <strong>The app never claims a message was
+  delivered when it wasn't</strong> — with no address configured the status reads "Queued (offline)"; with an
+  address it reports the server's actual verdict.</li>
+</ul>
+<p>Schema changes are versioned (<code>AppDatabase.VERSION = 3</code>): <code>MIGRATION_1_2</code> adds the outbox and
+<code>MIGRATION_2_3</code> adds the emergency-contact table, both additive, with no
+<code>fallbackToDestructiveMigration()</code>; each migration's SQL was verified against the generated <code>N.json</code> and
+is executed on the JVM by <code>RoomPersistenceTest</code>.</p>
+<p>Files: <code>domain/model/OutboxEvent.kt</code>, <code>data/database/entity/OutboxEventEntity.kt</code>,
+<code>data/database/dao/OutboxEventDao.kt</code>, <code>data/mapper/OutboxEventMappers.kt</code>,
+<code>data/repository/OutboxRepository.kt</code>, <code>outbox/OutboxPayloads.kt</code>, <code>outbox/SyncTransport.kt</code>,
+<code>outbox/OutboxSyncer.kt</code>, <code>data/database/DatabaseMigrations.kt</code> (all new); <code>data/database/AppDatabase.kt</code>,
+<code>AppContainer.kt</code> (modified). The authority client itself is described under deliverable 14 and in
+<code>docs/progress_log.md</code> §12.</p>
+<hr />
+<h2 id="6-deliverable-4-simulated-smartwatch">6. Deliverable 4 — Simulated smartwatch</h2>
+<p><strong>Design.</strong> A phone-screen "watch" that consumes the <strong>same real</strong> <code>TrackingSnapshot</code> (no second data
+source):</p>
+<ul>
+<li>face: <strong>SAFE / WARNING / SOS</strong>;</li>
+<li>shows the current location and the latest alert;</li>
+<li><strong>haptic on entering a restricted/dangerous zone</strong> — exactly once, behind a <code>WatchHaptics</code>
+  interface (<code>AndroidWatchHaptics</code> in production), so it does not buzz on every fix;</li>
+<li>a distinct, longer <strong>SOS</strong> vibration pattern;</li>
+<li>a <strong>SIMULATED SOS</strong> button that writes an SOS into the outbox (origin <code>SIMULATED_WATCH</code>);</li>
+<li>honest delivery status — "Queued" with the reason until an address is configured and a tourist is
+  signed in, then the <strong>real</strong> verdict from the authority;</li>
+<li>stamped unmistakably <strong>"SIMULATED WATCH — NOT PHYSICAL HARDWARE"</strong> so it can never be mistaken for
+  a real emergency device.</li>
+</ul>
+<p>Files: <code>watch/WatchUiState.kt</code>, <code>watch/WatchHaptics.kt</code>, <code>watch/AndroidWatchHaptics.kt</code>,
+<code>watch/WatchController.kt</code>, <code>ui/viewmodel/WatchViewModel.kt</code>, <code>ui/screens/WatchScreen.kt</code> (all new);
+<code>navigation/AppNavigation.kt</code> (WATCH route + top-bar action), <code>AndroidManifest.xml</code> (<code>VIBRATE</code>) —
+modified.</p>
+<hr />
+<h2 id="7-deliverable-5-ml-exploratory-data-analysis-pipeline-ml">7. Deliverable 5 — ML / exploratory-data-analysis pipeline (<code>ml/</code>)</h2>
+<p>Self-contained under <code>ml/</code>; <strong>supplements — never replaces</strong> the deterministic geo-fencing in <code>app/</code>
+and does not touch <code>app/</code>.</p>
+<h3 id="71-dataset-real-verified">7.1 Dataset (real, verified)</h3>
+<p>Microsoft Research <strong>GeoLife GPS Trajectories 1.3</strong> — the official archive was <strong>downloaded and
+unzipped here</strong> (313,164,406 bytes, 298.7 MB). Measured scale: <strong>182 user directories, 18,670
+<code>.plt</code> files, 24,876,978 data lines, 0 malformed rows</strong>. The guide claims 17,621 trajectories while
+the archive contains 18,670 — <strong>both are reported</strong>. No open-source licence is bundled; use is
+research-only with the required citation.</p>
+<h3 id="72-verified-schema-and-a-real-data-quirk">7.2 Verified schema and a real data quirk</h3>
+<p><code>.plt</code> = 6 header lines + CRLF + 7-token data lines; the two independent time encodings agree to
+within 4.8×10⁻⁶ s. <strong>Critical quirk:</strong> <code>.plt</code> file names collide across users (847 ids shared), so
+every grouping uses <code>traj_uid = user_id | trajectory_id</code> — otherwise different people's trajectories
+would silently merge (a leakage bug).</p>
+<h3 id="73-cleaning-eda">7.3 Cleaning &amp; EDA</h3>
+<p>Cleaning removes unparsable timestamps, out-of-range/null-island coordinates, duplicate
+<code>(trajectory, timestamp)</code> rows (698,900 removed), sorts and segments on gaps &gt; 120 s, and flags GPS
+jumps (&gt; 60 m/s). EDA produced <strong>12 figures + 11 tables + a findings document</strong> from real values
+(e.g. median sampling interval 2.00 s; median speed 3.23 m/s; busiest hour 09:00). Full detail in
+<code>docs/dataset_and_eda.md</code>.</p>
+<h3 id="74-model">7.4 Model</h3>
+<p>Unsupervised <code>sklearn.ensemble.IsolationForest</code> (200 trees, seed 42 — reproducible) over 14
+standardised movement features. Output = <strong>movement anomaly score</strong> (higher = more unusual), <strong>not a
+probability</strong> and <strong>not danger</strong>. Training used a 1,200-trajectory fixed-seed sample, split <strong>by
+<code>traj_uid</code></strong> (900 train / 300 test, 0 overlap).</p>
+<h3 id="75-evaluation-honest-by-construction">7.5 Evaluation — honest by construction</h3>
+<p>GeoLife has <strong>no anomaly/danger labels</strong>, so accuracy/F1 against real anomalies <strong>cannot be
+computed</strong> and is <strong>not reported</strong>. Validation uses <strong>real held-out data with synthetic labels</strong>
+(injected GPS teleports):</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ROC-AUC</td>
+<td><strong>0.8922</strong></td>
+</tr>
+<tr>
+<td>Average precision</td>
+<td><strong>0.6763</strong></td>
+</tr>
+<tr>
+<td>Precision@k / Recall@k (k = 17,462)</td>
+<td><strong>0.6165</strong> / <strong>0.6165</strong></td>
+</tr>
+<tr>
+<td>Label-shuffle control ROC-AUC</td>
+<td><strong>0.5007</strong></td>
+</tr>
+</tbody>
+</table>
+<p>A high score means teleport artefacts are separated well — <strong>not</strong> that real danger is detected.
+Full detail and limitations in <code>docs/model_card.md</code>.</p>
+<h3 id="76-the-synthetic-fallback">7.6 The SYNTHETIC fallback</h3>
+<p>A tiny, clearly-labelled synthetic fixture exists only so the pipeline and tests run on a machine
+without the 299 MB dataset. Every stage prints a loud SYNTHETIC banner and writes a distinct
+<code>SYNTHETIC/</code> directory. <strong>Synthetic numbers are plumbing tests, never results.</strong></p>
+<h3 id="77-movement-recognition-and-impact-detection-uci-har-supervised-shipped-on-the-device">7.7 Movement recognition and impact detection — UCI HAR (supervised, shipped on the device)</h3>
+<p>The GeoLife work above is GPS-only and unsupervised: it can say "this trajectory is unusual", which is
+not the same as <strong>what the person is doing</strong> or <strong>whether they just fell</strong>. That needed a second,
+supervised pipeline on a sensor dataset — the <strong>UCI HAR</strong> dataset listed in <code>DATASETS.pdf</code>.</p>
+<p>Two scikit-learn models are trained, exported to JSON, shipped in <code>assets/</code>, and walked on the phone by
+hand-written Kotlin (<code>motion/DecisionForest.kt</code>). <strong>No TensorFlow / TFLite / PyTorch, and no network at
+inference time</strong> — the two models together are under 330 KB, which is why a hand-written walker was
+chosen over a runtime.</p>
+<p><strong>Features.</strong> The phone computes <strong>24 time-domain features</strong> (<code>MotionFeatures.kt</code>) that mirror the
+Python extractor exactly, in the same order — validated on both sides of the wire. Accelerometer
+samples are converted to <em>g</em> by dividing by 9.80665 m/s² so the units match the dataset. The 561 UCI
+features (FFT energy bands, entropy) are not computable in real time on a phone.</p>
+<p><strong>Model A — activity recognition (real human labels).</strong> Random forest, 32 trees, depth 8.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th style="text-align: right;">Features</th>
+<th style="text-align: right;">Accuracy</th>
+<th style="text-align: right;">Macro-F1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Shipped on-device model</strong></td>
+<td style="text-align: right;"><strong>24</strong></td>
+<td style="text-align: right;"><strong>0.8351</strong></td>
+<td style="text-align: right;"><strong>0.8333</strong></td>
+</tr>
+<tr>
+<td>561-feature reference</td>
+<td style="text-align: right;">561</td>
+<td style="text-align: right;">0.9287</td>
+<td style="text-align: right;">0.9271</td>
+</tr>
+<tr>
+<td>Single decision tree (baseline)</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.7967</td>
+<td style="text-align: right;">0.7943</td>
+</tr>
+</tbody>
+</table>
+<p>Evaluated once on <strong>2947 held-out windows from 9 subjects never seen in training</strong> — the dataset's own
+subject-disjoint split, verified as <code>subject_overlap: []</code>. Adding the three per-axis means (the gravity
+direction, i.e. how the phone is held) is what carried the on-device model to 0.8351; the three walking
+variants are the confusion, and the app only ever asks the model the coarser question "is this person
+moving?" (<code>ActivityKind.isAmbulating</code>), which is exactly the distinction that is reliable.</p>
+<p><strong>Model B — impact / fall-signature detector (synthesised positives).</strong> Random forest, 40 trees, binary.</p>
+<blockquote>
+<p><strong>UCI HAR contains no falls.</strong> There is no fall class, no impact annotation and no subject who fell.
+So the positive class was <strong>manufactured</strong>: a fall-like transient (short free-fall dip, impact spike
+of several g, then stillness) was injected into real recorded windows from the held-out subjects; the
+negative class is those same recordings untouched.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ROC-AUC</td>
+<td style="text-align: right;"><strong>0.9999</strong></td>
+</tr>
+<tr>
+<td>Average precision</td>
+<td style="text-align: right;"><strong>0.9999</strong></td>
+</tr>
+<tr>
+<td>F1 @ 0.5</td>
+<td style="text-align: right;"><strong>0.9962</strong> (precision 0.9957, recall 0.9968)</td>
+</tr>
+<tr>
+<td><strong>Shuffled-label control ROC-AUC</strong></td>
+<td style="text-align: right;"><strong>0.5198</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The last row is what gives the others meaning: the identical pipeline on randomly permuted labels
+collapses to chance, so the near-perfect score is the detector finding the injected signature in real
+held-out recordings — not leakage or a label-encoding feature. <strong>It is still not a fall-detection
+claim</strong>: an injected impact is a large stereotyped transient, and a real fall can be gentle or look like
+sitting down quickly. The named upgrade path is <strong>SisFall / UniMiB SHAR / MobiFall</strong> (real falls), and
+it has deliberately not been claimed as done. The detector's score is also never sufficient on its own —
+see §7.9.</p>
+<p>An exporter bug was caught before it shipped: scikit-learn's <code>tree_.value</code> holds <strong>class fractions,
+not counts</strong>, so <code>np.rint(tree.value)</code> collapsed every leaf to a one-hot vector. The model would have
+loaded, run, and answered — just wrongly. Fixed to
+<code>np.rint(tree.value * tree.weighted_n_node_samples)</code>, with a pytest regression guard, and the exported
+JSON is verified against scikit-learn (max probability error <strong>4.97e-07</strong>, <strong>0</strong> argmax mismatches) both
+in Python and, independently, in Kotlin against the shipped asset.</p>
+<p>Full method, per-class tables, embedded confusion matrices, limitations and the reproduction commands:
+<strong><code>docs/model_card_movement.md</code></strong>.</p>
+<h3 id="78-historical-risk-analysis-on-approach-deliberately-not-a-model">7.8 Historical risk analysis on approach — deliberately <strong>not</strong> a model</h3>
+<p>When the tourist comes within 200 m of a restricted or dangerous boundary, the Tracking screen now shows
+an <strong>approach briefing</strong>: the zone, the distance, the tourist's <em>own</em> recorded crossings of that zone,
+and a 0–100 risk score with <strong>every factor itemised and explained</strong>.</p>
+<p>The score is a <strong>published weighted checklist</strong> (<code>ApproachRiskModel</code>), not a learned danger
+probability: zone severity (DANGEROUS 40 / RESTRICTED 28 / SAFE 5), 3 points per crossing in the last 7
+days capped at 18 (4 points for never-visited ground), proximity up to 16, night 12 / dusk 5,
+ambulating 4, and the live impact score 12 above threshold (6 neutral when no model is available).
+Bands are LOW &lt; 30 ≤ MODERATE &lt; 60 ≤ HIGH.</p>
+<p>It is deliberately not dressed up as a probability, because the app has <strong>no labelled outcome data</strong>
+and there is nothing to fit. The weights live in one place and are unit-tested (26 tests across
+<code>ApproachRiskTest</code>, <code>ZoneHistoryTest</code>, <code>ApproachBriefingTest</code>), including the invariants that the score
+never exceeds 100 and that the listed factors account for every point of it. The card says this to the
+user's face rather than only in the docs.</p>
+<h3 id="79-how-a-fall-is-actually-decided-on-the-phone">7.9 How a fall is actually decided on the phone</h3>
+<p>The model's score is <strong>one of three gates</strong>, and all three must agree before anything is reported:</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Threshold</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Impact magnitude</td>
+<td>≥ <strong>2.0 g</strong></td>
+<td>a hard fall lands roughly 2–5 g; below that it is a stumble or a dropped phone</td>
+</tr>
+<tr>
+<td>Model score</td>
+<td>≥ <strong>0.55</strong></td>
+<td>the window looks like the trained impact signature</td>
+</tr>
+<tr>
+<td>Stillness after the impact</td>
+<td>std ≤ <strong>0.12 g</strong></td>
+<td>measured from the <em>last</em> sample at or above the impact threshold, so the impact plateau itself is not mistaken for stillness</td>
+</tr>
+<tr>
+<td>Cooldown</td>
+<td>15 s</td>
+<td>overlapping windows mean one fall would otherwise raise five alerts</td>
+</tr>
+<tr>
+<td>Tail fraction</td>
+<td>0.25</td>
+<td>if the peak lands in the final quarter there is not enough signal to judge stillness, so that gate is <strong>skipped</strong>, not failed</td>
+</tr>
+</tbody>
+</table>
+<p>Consequences visible in the UI: the face shows the probability <strong>and</strong> its threshold, the peak g, the
+stillness value and its threshold, and it says <strong>"suspected"</strong>. A high model score with no physical
+impact raises nothing, and <strong>no SOS is ever sent automatically</strong>.</p>
+<h3 id="710-a-genuine-supervised-future-risk-prediction-on-device-and-honest-about-its-basis">7.10 A genuine supervised <em>future</em> risk prediction — on-device, and honest about its basis</h3>
+<p>Everything above is either a configured rule (§7.8's approach checklist) or a detector that reacts to an
+impact that <strong>has already happened</strong> (§7.9). This round adds the third, genuinely different thing the
+brief asked for: a <strong>trained model that predicts an event before it happens</strong>, and it deliberately does
+<em>not</em> pretend the project's four named datasets can support it.</p>
+<p><strong>The dataset problem, stated plainly.</strong> GeoLife, UCI HAR, OpenStreetMap and OpenWeatherMap/Open-Meteo
+contain <strong>no outcome labels at all</strong> — no injuries, no incidents, no falls. A supervised tourist-incident
+model cannot be trained from them, and inventing labels would be fabrication. The honest options were to
+find a dataset with real outcome labels or to ship nothing; this round did the former and documents the
+swap.</p>
+<p><strong>The dataset actually used.</strong> <strong>UniMiB SHAR</strong> (Micucci, Mobilio, Napoletano, 2017) — 30 subjects, 9
+activities of daily living and 8 real fall types, 50 Hz phone accelerometer, with <strong>real recorded falls</strong>.
+1,980 trials were read; <strong>1,979 used</strong>. One recording (subject 10, <code>Jumping</code>, trial 1) contains
+9,369/9,624 non-finite values and was <strong>dropped, counted and reported</strong>, not repaired. The dataset has
+no OSI licence; the provenance file says so rather than inventing one. Full provenance is in
+<code>docs/future_risk_prediction.md</code> §2.</p>
+<p><strong>The target and the horizon.</strong> <code>IMMINENT_FALL</code> = <em>a hard fall impact lands within the next second</em>.
+Impact instant = <code>argmax(magnitude)</code> of the trial, accepted at ≥ 2.0 g (the app's own
+<code>FallPolicy.MIN_IMPACT_G</code>); 6 fall trials never reach 2 g and are excluded and counted. Horizon and
+feature window are both <strong>50 samples = 1.0 s</strong>, chosen because fall trials run 151–446 samples with the
+impact around index ~120, leaving ≥ 95 pre-impact samples — so <strong>1.0 s is the longest fully supported
+horizon</strong>, not a round number. <strong>A 30-minute horizon is explicitly not attempted</strong>, because no
+accelerometer can see 30 minutes ahead.</p>
+<p><strong>No leakage, checked not asserted.</strong> A window ending at <code>t</code> uses samples <code>[t-49, t]</code>; the label asks
+about <code>(t, t+50]</code>. The two intervals are disjoint, <code>train.check_no_future_information()</code> re-derives that
+from the raw recordings on every run, and a <strong>shuffled-label control</strong> (same features, same pipeline,
+permuted labels) scores <strong>ROC-AUC 0.477</strong> — chance, as it must be if nothing leaks.</p>
+<p><strong>Method.</strong> Subject-disjoint 60/20/20 split, seed 42, 30 subjects → 18/6/6 (<strong>disjoint: true</strong>);
+51,128 windows (6,458 positive / 44,670 negative); <code>class_weight="balanced_subsample"</code>. <strong>No scaler is
+fitted at all</strong> — every feature is scale-free within its own window — so there is no fitted preprocessing
+step that could carry a global mean from train to test. Validation subjects were used only for the Platt
+calibration, the two band thresholds and the hyper-parameter search; the test subjects were scored once.</p>
+<p><strong>Measured, on held-out subjects (10,415 windows, 6 unseen subjects, 1,339 positive):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Precision</th>
+<th>Recall</th>
+<th>F1</th>
+<th>ROC-AUC</th>
+<th>PR-AUC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Majority class</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.5000</td>
+<td>0.128565</td>
+</tr>
+<tr>
+<td>Logistic regression</td>
+<td>0.4760</td>
+<td>0.8432</td>
+<td>0.6085</td>
+<td>0.904389</td>
+<td>0.659633</td>
+</tr>
+<tr>
+<td>Hist gradient boosting</td>
+<td><strong>0.7916</strong></td>
+<td>0.6721</td>
+<td><strong>0.7270</strong></td>
+<td><strong>0.945913</strong></td>
+<td><strong>0.815000</strong></td>
+</tr>
+<tr>
+<td><strong>Random forest, calibrated, shipped</strong></td>
+<td><strong>0.6707</strong></td>
+<td><strong>0.7498</strong></td>
+<td><strong>0.7080</strong></td>
+<td><strong>0.936848</strong></td>
+<td><strong>0.764569</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Plus the numbers that matter more than a window metric: <strong>trial sensitivity 0.929577</strong> (264 of 284 real
+held-out falls flagged at least once), and an <strong>honest false-alarm rate of 5.09 per minute</strong> of ordinary
+activity at the app's cadence (16.30/min at the raw window stride), concentrated in <em>jumping</em>, <em>sitting
+down</em> and <em>lying down</em> — the three activities where a body really does drop under gravity.</p>
+<p><strong>Model selection under a real deployment constraint.</strong> 65 configurations were searched on validation
+only. The quality winner (300 trees, unbounded depth, val PR-AUC <strong>0.875909</strong>) exports to <strong>20,059.7 KB</strong>
+and cannot ship to a phone; the chosen configuration (120 trees, depth 11, leaf 4, val PR-AUC
+<strong>0.845112</strong>) exports to <strong>1,968,314 bytes</strong> and ships at <strong>1,974,297 bytes</strong> with its metadata, against a
+<strong>2,000,000-byte</strong> budget that only <strong>1 of 65</strong> configurations satisfies. The <strong>−0.031 PR-AUC cost is
+stated in the model card</strong>, along with the fact that <code>hist_gradient_boosting</code> (0.8150) beats the shipped
+model and is <em>not</em> shippable on-device. The selection rule lives in <code>tuning.json</code> and is re-derived by a test.</p>
+<p><strong>Calibration.</strong> Platt scaling on <code>logit(p_forest)</code>, fitted on the <strong>validation split only</strong>
+(a = 1.249403, b = −1.079049), improves the Brier score from <strong>0.062600 → 0.056675</strong>. The reliability
+table is published <em>including</em> the bins that are over-confident (0.2–0.4), because hiding them would be
+the dishonest choice. Bands: <strong>HIGH ≥ 0.314046</strong> (validation max-F1) and <strong>MODERATE ≥ 0.069201</strong>
+(largest validation threshold keeping recall ≥ 0.95), both fitted on validation and shipped inside the
+artefact.</p>
+<p><strong>Where inference runs: on the device.</strong> The model reuses the app's <strong>existing</strong> <code>DecisionForest</code> JSON
+walker (the only change is an optional <code>expectedFeatures</code> parameter so a 22-feature model loads without
+weakening the existing 24-feature check) — <strong>no new ML framework, runtime or format was added</strong>. It is fed
+by the <strong>same</strong> acceleration subscription the movement watch already owns, taking the last 50 samples of
+each window, so there is no second listener and no extra battery cost. That makes the tourist-facing
+prediction work <strong>fully offline</strong>, and means no accelerometer data leaves the phone.</p>
+<p><strong>Three things kept visibly apart.</strong> The app now shows, as separate cards: the <strong>configured geofence</strong>
+status, the <strong>approach-risk checklist</strong> (§7.8, a published heuristic with no probability), and the
+<strong>future risk prediction</strong> (this model — the only one of the three that is trained, and the only one that
+shows a probability). The card's own text names the other two and denies being them; it carries the
+non-causal caveat for its factor list and states that it <strong>never sends an SOS by itself</strong>. Both sentences
+are asserted by tests, and <code>backend/tests/test_risk.py</code> asserts that a HIGH prediction leaves
+<code>latestSos</code> empty and <code>state != "SOS"</code> — <strong>risk can never raise an SOS</strong>.</p>
+<p><strong>What reaches the authority.</strong> A throttled <strong>summary</strong> (never raw sensor data) travels through the
+existing offline outbox as a new <code>OutboxKind.RISK</code> event with <code>origin = ON_DEVICE_MODEL</code>
+(<code>isSimulated = false</code>): first elevated band, any escalation, a 120 s refresh, and one "cleared" record
+when the band drops back to LOW. <code>UNAVAILABLE</code> and stale bands are never sent; the backend <strong>rejects</strong>
+<code>UNAVAILABLE</code> outright. Predictions are stored in their own <code>risk_assessments</code> table and shown in their
+own dashboard panel and tiles (<code>GET /api/v1/authority/risk</code>, per-tourist history, <code>latestRisk</code>) — never
+mixed into the SOS queue or the incident feed. This is what the earlier round's database gap was about:
+the dashboard previously had no table that could hold a prediction, so it neither received nor displayed
+one.</p>
+<p><strong>The honest bottom line.</strong> This is a real model, with real held-out numbers, real leakage controls and a
+real on-device path — and it is <strong>not a deployment-ready fall alarm</strong>. 5.09 false alarms per minute of
+ordinary movement, mid-range probabilities that are over-confident, lab-recorded data from 30 adults, and
+an untestable phone-drop-vs-person-fall failure mode are all in the model card. It is reported to the
+tourist as an informational state and to the authority as a labelled prediction, and it changes no
+operational state.</p>
+<p><strong>Not verified:</strong> the card's rendering on a real screen and the whole sensor→forest→card chain on real
+hardware. No emulator, AVD or device exists in this environment (<code>adb devices</code> is empty); the wording is
+instead pinned by <code>FutureRiskCardModelTest</code> (18 tests) and the inference by
+<code>FutureRiskReferenceTest</code>, which replays the <em>shipped</em> asset against scikit-learn's own probabilities for
+16 real held-out windows.</p>
+<p>Full model card, dataset provenance, measured metrics, calibration table, false-alarm breakdown and the
+complete limitations list: <strong><code>docs/future_risk_prediction.md</code></strong>. Everything is reproducible with
+<code>python ml/future_risk/train.py</code> and <code>powershell -File ml\run_all.ps1 -FutureRisk</code>.</p>
+<h3 id="711-self-service-tourist-registration-the-tourist-creates-their-own-account">7.11 Self-service tourist registration — the tourist creates their own account</h3>
+<p>Every tourist account in this project until now was created <strong>by an officer</strong> at the dashboard, and the
+tourist signed in with an id and a one-time password. That is the wrong shape for a tourist who simply
+installs the app: with nobody at a desk, there was no way to start. This round adds the missing journey —
+<strong>register from the phone</strong> — and makes the result visible to the authority without any officer action.</p>
+<p><strong>The ID is minted by the database, not the client.</strong> A client-side counter is the classic bug here: two
+phones registering in the same second both compute "00124". Instead a new table,
+<code>tourist_id_sequence (id INTEGER PRIMARY KEY AUTOINCREMENT, issued_at INTEGER NOT NULL)</code>, is the ledger:
+each registration consumes one row and reads the number SQLite issued. The text id is
+<code>TR-&lt;current UTC year&gt;-&lt;5-digit number&gt;</code> — e.g. <code>TR-2026-00124</code> — and because <code>tourists.id</code> is a <strong>primary
+key</strong>, even a text collision cannot produce a duplicate: the code steps over to the next number. The
+counter is never reset, across years or restarts. <code>test_registration.py</code> registers twelve tourists in a row
+(twelve distinct ids) and forces a collision to prove the step-over.</p>
+<p><strong>The PIN is the credential, and nothing secret is returned.</strong> Self-registration keeps the existing
+<code>NOT NULL</code> <code>password_salt</code> / <code>password_hash</code> schema (no migration risk to existing rows) by writing a
+<strong>random, immediately discarded</strong> secret into those columns; the account's real credential is the PIN,
+through the project's existing scrypt <code>hash_password</code>. The response contains <strong>only</strong> the id and the
+account's public fields — no token, no password, no PIN, no salt, no digest — and <strong>registering does not
+sign anybody in</strong>. The tourist signs in as a separate step with the id and the PIN they chose.</p>
+<p><strong>One public write, and the escalation it refuses.</strong> <code>POST /api/v1/auth/register</code> creates only <code>tourists</code>
+rows, reads <strong>no privilege field</strong> (a body carrying <code>"role": "authority"</code> is <code>400</code>, and there is no field
+that could grant one — the path does not exist rather than being blocked), issues no session, and treats a
+phone number that is already registered as <code>409</code>. Validation is pure and lives in one place,
+<code>backend/tsm/registration.py</code>, reusing <code>hash_password</code> and the same contacts validator the outbox uses, so a
+contact accepted here is a contact the sync path would accept.</p>
+<p><strong>The app.</strong> The Authority screen's sign-in card gained two deliberate modes — <em>Sign in</em> and <em>Register as
+tourist</em>. The form collects a name, phone number, a chosen PIN and its confirmation, and any number of
+emergency contacts (added one at a time, removable). It is validated on the phone first (a mistyped
+confirmation is answered instantly, with no round-trip) and the server's <code>409</code> is shown as <em>"already
+registered"</em> rather than a generic failure. On success the card becomes a <strong>registration-success screen</strong>
+showing the id in a monospace readout with a <strong>Copy Tourist ID</strong> button, plus a plain-language instruction
+on how to sign in next (<code>RegistrationForm.kt</code>, <code>AuthorityContract.kt</code>/<code>AuthorityApi.kt</code>/<code>AuthorityClient.kt</code>,
+<code>AuthorityViewModel.kt</code>, <code>ui/screens/AuthorityScreen.kt</code>).</p>
+<p><strong>The dashboard.</strong> <code>GET /api/v1/authority/tourists</code> was enriched <strong>additively</strong> and the panel became
+<strong>"Registered Tourists"</strong>. Each row separates three different facts that used to be conflated:</p>
+<ul>
+<li><strong>registration</strong> — is this a real account? (<code>registrationStatus</code>, <code>registeredAtMillis</code>,
+  <code>registrationSource</code>: <code>SELF</code> for an app registration, the officer's id for a desk account, <code>null</code> older);</li>
+<li><strong>tracking</strong> — have we heard from the phone? (<code>trackingStatus</code>, <code>lastSeenMillis</code>, <code>hasPosition</code>,
+  <code>latestPosition</code>);</li>
+<li><strong>safety</strong> — <code>openSosCount</code>, <code>latestRiskBand</code>, <code>latestRiskAtMillis</code> (unchanged in meaning).</li>
+</ul>
+<p>A tourist who has registered but never reported reads <strong>"Location not yet available"</strong>; a position is never
+invented. New registrations appear at the top of the newest-first list on the next refresh, with no officer
+action.</p>
+<p><strong>A latent bug found on the way.</strong> While extending the register, the <code>RISK</code> ingest was found to insert its
+<code>risk_assessments</code> row <strong>outside</strong> the <code>with db().write()</code> block that inserted its <code>events</code> row, so a
+prediction and its audit entry could commit separately. It now runs in the same transaction. The prediction
+itself is unchanged.</p>
+<p><strong>What was run.</strong> Backend <strong>265</strong> tests (+45), acceptance <strong>41/41</strong> (+8), Android JVM <strong>515</strong> tests
+(+31 across five classes — the suite has since grown to <strong>548</strong>; see §7.12–7.13 for the next rounds), and the
+opt-in live test against a real <code>run.py</code> <strong>6/6</strong> at that point (now <strong>7/7</strong>) — the new case
+registered <code>TR-2026-00001</code> with no credential, signed in with that id and the chosen PIN, read the row back
+from the officer's authenticated API (<code>registrationStatus=REGISTERED</code>, <code>trackingStatus=AWAITING_FIRST_REPORT</code>,
+<code>hasPosition=false</code>, <code>latestPosition=null</code>), then delivered a real-GPS report and watched the same row become
+<code>trackingStatus=OK</code>, <code>hasPosition=true</code>, <code>position={18.5204, 73.8567, simulated:false}</code>.</p>
+<p><strong>Not verified:</strong> the registration <strong>screen</strong> itself (the mode toggle, the form, the success card and its
+copy button) was never rendered, and the dashboard panel was never opened in a browser — there is still no
+emulator, device or browser in this environment (INST-24). The logic is JVM-tested, the wire format is
+real-socket-tested, and the whole journey runs through the <strong>production</strong> client against a real server on
+the JVM.</p>
+<h3 id="712-two-role-sign-in-and-the-button-that-was-dead-on-a-fresh-install">7.12 Two-role sign-in, and the button that was dead on a fresh install</h3>
+<p><strong>The reported symptom.</strong> On a phone with a fresh install, the app opened on the <em>Authority</em> screen with
+<strong>NOT SIGNED IN</strong> and both <strong>Sign in with PIN</strong> and <strong>Create my account</strong> greyed out. Nothing on the screen
+explained why, and no Tourist ID was ever generated.</p>
+<p><strong>The root cause, exactly.</strong> Those two controls — and <em>Save address</em> — were enabled with</p>
+<pre><code class="language-kotlin">enabled = !busy &amp;&amp; address.isNotBlank()
+</code></pre>
+<p>and <code>address</code> was seeded from the stored session's <code>baseUrl</code>, which is <strong>empty on a fresh install</strong>. So the
+first thing a new user saw was three dead buttons whose only requirement was an address that the app never
+asked for and never explained. It was not a registration bug and not a credential bug: the <em>submission</em>
+controls were gated on a <strong>field the tourist was never meant to fill in</strong>. Two further consequences fell
+out of the same code: the sign-in and registration flows lived on the same screen as the operator's backend
+configuration, and a tourist could reach the authority configuration at all.</p>
+<p><strong>The fix.</strong></p>
+<ol>
+<li><strong>The gate moved to form validity.</strong> <code>RegistrationForm.fieldErrors(...)</code> now reports a problem <em>per
+   field</em> and <code>RegistrationForm.outstanding(...)</code> lists only what is genuinely missing; the button is live
+   whenever the form is not in flight, and pressing it with a bad form shows the named problems instead of
+   doing nothing. <strong>No submit control anywhere depends on a backend address.</strong></li>
+<li><strong>The address left the tourist's path.</strong> It lives in <em>Settings → Backend connection (advanced)</em>, where
+   <strong>Test connection</strong> performs a real <code>GET /api/v1/health</code> — <em>Connected</em> is reported only when something
+   actually answered, and an address with nothing behind it reports <em>Offline</em>.</li>
+<li><strong>A build-time default, seeded once.</strong> <code>-PAUTHORITY_URL</code> (or <code>TSM_AUTHORITY_URL</code>, or <code>AUTHORITY_URL=</code> in
+   <code>local.properties</code>) becomes <code>BuildConfig.DEFAULT_AUTHORITY_URL</code>; <code>AppContainer.start()</code> writes it with
+   <code>seedBaseUrlIfUnset</code>, which is a no-op when the user has already chosen an address. The APK attached to
+   this pass carries <code>http://192.168.1.102:8080</code>, so a first launch on this machine's Wi-Fi is already
+   pointed at the server.</li>
+<li><strong>The two roles became two sessions.</strong> The app opens on a <strong>Welcome</strong> screen with <em>I'm a tourist</em> and
+   <em>I'm an authority officer</em>; a returning tourist with a valid session is offered <em>Continue</em> above the
+   choices. Tourist and officer sessions are stored under <strong>separate keys</strong> in the same DataStore, so an
+   officer sign-in does not make the phone a tracked tourist, and either sign-out leaves the other alone.</li>
+<li><strong>The role boundary is the server's.</strong> The officer console reads <code>GET /api/v1/authority/tourists</code>, which
+   already required <code>require_auth("authority")</code>. Hiding the screen in the app proves nothing; the live test
+   presents a <strong>tourist</strong> token to that route and gets <strong>403</strong> (§9).</li>
+</ol>
+<p><strong>What was run for this round.</strong> Android JVM <strong>545 tests, 0 failures, 0 errors, 7 skipped</strong> across <strong>49
+classes</strong> (the suite has since grown to <strong>548 / 50 classes</strong> — see §7.13) (up from 515/47: <strong>+30 cases</strong> — <code>OfficerViewModelTest</code> 10 new, <code>AuthoritySessionStoreTest</code> 8 new,
+<code>RegistrationFormTest</code> +5, <code>AuthorityApiTest</code> +4, <code>AuthorityHttpServerTest</code> +2, <code>AuthorityLiveBackendTest</code>
++1). The backend (<strong>265</strong>), acceptance (<strong>41/41</strong>) and ML (<strong>179</strong>) suites were re-run unchanged and stayed
+green. The live suite was run against a real <code>run.py</code> with <code>-Dtsm.e2e.baseUrl</code> and reported <strong>7/7,
+0 skipped</strong>.</p>
+<p><strong>A genuine finding on the way.</strong> The session store's constructor took a <code>Context</code> only to derive a default
+<code>DataStore</code>, which made it untestable off-device. It now takes the <code>DataStore</code> directly, with
+<code>createAuthoritySessionStore(context)</code> as the production factory — which is what makes "the session survives
+a restart" and "the officer session is separate" <em>assertable</em> rather than asserted-by-inspection. The new
+<code>AuthoritySessionStoreTest</code> drives a real <code>PreferenceDataStore</code> over a throw-away file on the plain JVM,
+with no Robolectric.</p>
+<p><strong>Not verified:</strong> the Welcome screen, the tourist sign-in/create-account screen and the officer console were
+never rendered — there is still no emulator or device here (INST-24/25). Their logic is JVM-tested, the
+register route is real-socket-tested both ways, and both client methods run against a real server.</p>
+<h3 id="713-the-phone-could-never-reach-the-authority-and-it-was-android-not-the-server">7.13 The phone could never reach the authority — and it was Android, not the server</h3>
+<p><strong>The report.</strong> Two screenshots taken on a real phone. The tourist sign-in screen showed the red banner
+<em>"The authority at http://192.168.1.102:8080 is not answering. Check that the server is running and that
+this phone is on the same Wi-Fi network."</em> and the connection card read <strong>Status: Offline</strong>. The officer
+screen showed the same address with the raw sentence <em>"Cannot reach http://192.168.1.102:8080: <strong>Cleartext
+HTTP traffic to 192.168.1.102 not permitted</strong>"</em>.</p>
+<p><strong>The root cause, exactly.</strong> The second sentence is not written by this app — it is Android's. The app talks
+to its authority over <strong>plain HTTP</strong> (<code>http://192.168.1.102:8080</code>); the client wraps any <code>IOException</code> as
+<code>Unreachable</code> and prints the platform's message verbatim. <strong>Android 9 (API 28) and later refuse cleartext
+HTTP by default for any app whose <code>targetSdk</code> is 28+</strong>, this app targets <strong>35</strong>, and the manifest declared
+neither <code>android:usesCleartextTraffic</code> nor <code>android:networkSecurityConfig</code>. The request was therefore killed
+by the <strong>network-security policy before it reached the network</strong>: the server was never asked, never
+answered, and never logged a request from the phone — which is precisely what its access log shows. The
+tourist screen's softer "is not answering" is the same failure, summarised. This was true from the first
+build; restarting <code>run.py</code> could never have changed it.</p>
+<p><strong>The fix.</strong></p>
+<ol>
+<li><strong><code>app/src/main/res/xml/network_security_config.xml</code></strong> (new) — a <code>&lt;base-config
+   cleartextTrafficPermitted="true"&gt;</code>, with the reasoning written into the file so a later "hardening" pass
+   cannot silently re-break the app, plus what to do if the authority ever gains TLS.</li>
+<li><strong><code>AndroidManifest.xml</code></strong> — the <code>&lt;application&gt;</code> now declares
+   <code>android:networkSecurityConfig="@xml/network_security_config"</code>.</li>
+<li><strong><code>NetworkSecurityConfigTest</code></strong> (new, 3 cases) — reads the shipped manifest and profile and fails the
+   build if the manifest stops pointing at a cleartext-permitting profile, or re-blocks it with
+   <code>usesCleartextTraffic="false"</code>.</li>
+</ol>
+<p><strong>What was run for this round.</strong> Android JVM <strong>548 tests, 0 failures, 0 errors, 7 skipped</strong> across <strong>50
+classes</strong> (<strong>+3</strong>, all <code>NetworkSecurityConfigTest</code>). The backend (<strong>265</strong>), acceptance (<strong>41/41</strong>) and ML
+(<strong>179</strong>) suites were re-run unchanged and stayed green. The built artefact was verified directly:
+<code>aapt2 dump xmltree</code> shows <code>android:networkSecurityConfig(0x01010527)=@0x7f0c0002</code> on <code>&lt;application&gt;</code>, and
+<code>aapt2 dump resources</code> resolves <code>0x7f0c0002</code> to <code>res/xml/network_security_config.xml</code>, whose bytes contain
+<code>cleartextTrafficPermitted</code>. The opt-in live suite was <strong>not re-run</strong> this round (the backend was stopped),
+so its seven cases skip in this run; their last measured result is §7.12's <strong>7/7</strong>.</p>
+<p><strong>Not verified:</strong> that the banner actually clears on the phone — that needs the new APK installed on a real
+device (INST-24/25). What is proven is that the artefact now contains the policy Android requires, and that
+the setting cannot silently regress without a failing test.</p>
+<hr />
+<h2 id="8-deliverables-13-14-the-authority-backend-and-the-real-transport">8. Deliverables 13 &amp; 14 — the authority backend and the real transport</h2>
+<p>This is the round this report's date was revised for: the app can now actually deliver events, and there
+is a service on the other end to receive and work them.</p>
+<h3 id="81-what-the-app-sends">8.1 What the app sends</h3>
+<p>A new <strong>authority client</strong> (<code>app/src/main/java/com/touristsafety/app/authority/</code>) speaks the backend's
+HTTP contract: a hand-written JSON codec (<code>Json.kt</code> — used instead of <code>org.json</code>, which returns nulls on
+the plain JVM, so the whole client stays unit-testable), the wire codec, an <code>HttpURLConnection</code> layer, and
+a durable transport. The app's transport is now a <strong>selector</strong>: it uses the real authority transport when
+a base URL is configured and the honest <code>NoBackendTransport</code> otherwise, reading the address at flush time
+so <strong>setting an address takes effect on the next flush with no restart</strong>. The base URL and bearer token
+live in their own DataStore file (<code>authority_session</code>), separate from <code>AppSettings</code>.</p>
+<p>Emergency contacts are <strong>uploaded through the durable outbox</strong> (<code>OutboxKind.CONTACTS</code>), not a direct
+<code>PUT</code>, so an offline edit still syncs when the network returns.</p>
+<h3 id="82-the-delivery-rules-why-a-mistake-cannot-lose-an-event">8.2 The delivery rules (why a mistake cannot lose an event)</h3>
+<p>The mapping from a server verdict onto the outbox is deliberately biased: only a <em>permanent</em> rejection
+discards an event.</p>
+<table>
+<thead>
+<tr>
+<th>Server outcome</th>
+<th>Outbox result</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DELIVERED</code></td>
+<td><strong>Delivered</strong> (ack id)</td>
+<td>stored by the authority</td>
+</tr>
+<tr>
+<td><code>DUPLICATE</code></td>
+<td><strong>Delivered</strong></td>
+<td>idempotency — the server already has it</td>
+</tr>
+<tr>
+<td><code>REJECTED</code> (or 400/422)</td>
+<td><strong>Rejected</strong> with the reason</td>
+<td>the same bytes can never be accepted</td>
+</tr>
+<tr>
+<td>401 / 403</td>
+<td><strong>Retry</strong></td>
+<td>re-signing-in will deliver it</td>
+</tr>
+<tr>
+<td>404 / 409 / 5xx / IO / malformed</td>
+<td><strong>Retry</strong></td>
+<td>could be a misconfiguration — never discard</td>
+</tr>
+</tbody>
+</table>
+<h3 id="83-the-backend-and-the-dashboard">8.3 The backend and the dashboard</h3>
+<p><code>backend/</code> is one Flask app over one SQLite file, serving both the phone API and a static operator
+dashboard at <code>/</code>. It generates its own credentials on first start and writes them once to
+<code>backend/var/DEV_CREDENTIALS.txt</code>; <strong>no password is written into the source</strong>, and <code>test_security.py</code>
+asserts that. The <code>events</code> table is append-only with a <code>UNIQUE (tourist_id, dedupe_key)</code> index — that
+index is what makes re-delivery harmless — and an SOS has its own table because it has a workflow
+(OPEN → ACKNOWLEDGED).</p>
+<p>Run it with <code>python backend\run.py</code>; the dashboard is then at <a href="http://127.0.0.1:8080/">http://127.0.0.1:8080/</a>. Point the phone at
+it in <strong>Settings → Backend connection (advanced)</strong>: <code>10.0.2.2:8080</code> from an emulator, or the printed LAN
+address from a physical phone. (A debug build can also bake a first-launch default in; this pass's APK
+carries <code>http://192.168.1.102:8080</code>.) Press <strong>Test connection</strong> and confirm it reports <em>Connected</em> — the
+screen only claims that after a real <code>GET /api/v1/health</code> answered. Until an address is set <strong>and</strong> a
+tourist is signed in, events stay queued and the app says so. Full detail: <code>backend/README.md</code>.</p>
+<h3 id="84-what-was-verified-and-refused-to-be-claimed">8.4 What was verified, and refused to be claimed</h3>
+<ul>
+<li><strong>Backend rules:</strong> <code>python -m pytest backend\tests -q</code> → <strong>265 passed</strong> (in-process Flask client, temp
+  SQLite, frozen clock).</li>
+<li><strong>Backend acceptance, real subprocess:</strong> <code>python backend\verify_integration.py</code> → <strong>41/41 PASS</strong>
+  (self-registration and sign-in with the minted id + PIN, duplicate phone 409 / role escalation 400,
+  delivery, idempotency, SOS acknowledgement, the future-risk prediction reaching <code>/authority/risk</code>
+  while raising no SOS, restart persistence, dashboard fetch).</li>
+<li><strong>The production Kotlin client against a real server:</strong> <code>AuthorityLiveBackendTest</code> <strong>7/7 passed</strong> — it
+  <strong>self-registered a tourist with no credential and received <code>TR-2026-00001</code>, signed in with that id and
+  the PIN it chose, and confirmed the officer's register showed it as <code>SELF</code>/<code>REGISTERED</code> with no position
+  before a real-GPS report turned the same row into <code>trackingStatus=OK</code>, <code>hasPosition=true</code></strong>; it also
+  signed in as a real tourist, flushed a real SOS, got a server event id, saw <code>/me</code> report
+  <code>delivered=1 latestSos=OPEN simulated=true</code>, confirmed <strong>one</strong> officer-queue row after a duplicate,
+  delivered a <strong>real-GPS position report</strong> that landed on the authority map
+  (<code>latestPosition: 18.5204,73.8567 simulated=false</code>), set a PIN and then signed in with it (a wrong PIN →
+  HTTP 401), <strong>signed in as an officer and read the register through the app's own console method while a
+  tourist token was refused the same route with HTTP 403</strong>, showed a dead backend keeps the event queued
+  with a reason, and pushed an <strong>on-device
+  future-risk summary</strong> through the production payload builder and queue: the authority stored it, labelled
+  it <code>PREDICTION</code>, counted it as elevated risk (<code>riskAssessments=1</code>, <code>riskElevated=1</code>) while <strong><code>sosTotal</code>
+  stayed at 1</strong> — a forecast is not an incident.</li>
+</ul>
+<p><strong>NOT claimed:</strong> that it works <em>from a device</em>. The device's own <code>HttpURLConnection</code>, emulator loopback /
+Wi-Fi routing and the Compose Authority screen (including the new registration screen) were never exercised
+(INST-20, INST-21, INST-24). A simulated SOS
+is stored and badged as <strong>simulated</strong> everywhere; nothing is contacted automatically. Routine <code>POSITION</code>
+reporting now exists (item 15) behind an explicit, tourist-controlled interval/distance policy, but the
+on-device GPS that would drive it has not been run here.</p>
+<hr />
+<h2 id="9-testing-verification">9. Testing &amp; verification</h2>
+<ul>
+<li>Android JVM suite: <strong>548 tests, 0 failures, 0 errors, 7 skipped</strong> across <strong>50 classes</strong>
+  (<code>:app:testDebugUnitTest</code>, re-run this round with <code>--rerun</code>). The seven skips are the opt-in live-backend
+  tests, which run only when given <code>-Dtsm.e2e.baseUrl</code> (they last ran 7/7 in the previous round). The most
+  recent round added <strong>3 tests in one new class</strong> — <code>NetworkSecurityConfigTest</code>, which pins the manifest +
+  network-security-profile pair that lets a plain-HTTP LAN authority be reached at all (§7.13). The round
+  before it added <strong>30 tests across two new classes and four grown ones</strong> for the two-role split and the
+  dead-button fix — officer sign-in/console (<code>OfficerViewModelTest</code>, 10), the real on-disk session store
+  (<code>AuthoritySessionStoreTest</code>, 8), per-field form errors (<code>RegistrationFormTest</code> 13 → 18), the officer
+  register codec (<code>AuthorityApiTest</code> 24 → 28), the officer register over a real socket
+  (<code>AuthorityHttpServerTest</code> 12 → 14) and a <strong>seventh live end-to-end test</strong>
+  (<code>AuthorityLiveBackendTest</code> 6 → 7). The round before it added <strong>31 tests across five classes</strong> for
+  self-service registration — the form rules
+  (<code>RegistrationFormTest</code>, 13), the request/response codec and a real-socket registration
+  (<code>AuthorityApiTest</code> 20 → 24, <code>AuthorityHttpServerTest</code> 10 → 12), the ViewModel state machine
+  (<code>AuthorityViewModelTest</code>, 11) and a <strong>sixth live end-to-end test</strong> (<code>AuthorityLiveBackendTest</code> 5 → 6) —
+  and an earlier round added <strong>94</strong> for the future-event model: the 22 features index by index
+  (<code>FutureRiskFeaturesTest</code>, 13), <strong>the shipped asset against scikit-learn's own probabilities on 16 real
+  held-out windows</strong> (<code>FutureRiskReferenceTest</code>, 6), inference/bands/staleness/insufficient data
+  (<code>FutureRiskAnalyzerTest</code>, 18), the sharing policy (<code>FutureRiskReportPolicyTest</code>, 10), the durable
+  outbox path (<code>FutureRiskReporterTest</code>, 12), the sensor integration (<code>FutureRiskMovementIntegrationTest</code>,
+  8), the wire contract (<code>FutureRiskPayloadTest</code>, 8) and what the card is allowed to say
+  (<code>FutureRiskCardModelTest</code>, 18). Earlier rounds still covered
+  routine position reporting, the PIN/position payloads, the authority client and its transport rules, a
+  real-socket HTTP test, the JSON codec, the emergency-contact repository, the resume-recovery rule, the
+  geofence walk-through, the on-screen diagnostics, the movement/fall pipeline, the approach-risk maths,
+  the shipped-forest fidelity and the SOS delivery ordering rule.</li>
+<li>Authority backend: <strong>265 tests</strong> (<code>python -m pytest backend/tests -q</code>, executed this round — up from
+  220; the new <code>test_registration.py</code> contributes 45) plus a <strong>41/41</strong> real-subprocess acceptance run
+  (<code>python backend/verify_integration.py</code>).</li>
+<li>Live client → real server: <code>AuthorityLiveBackendTest</code> <strong>7/7 passed</strong> on the JVM, driving the production
+  Kotlin client against <code>python backend/run.py</code> (<strong>self-registration → the server-minted Tourist ID →
+  signing in with it → the officer's register showing it with no position → a real position arriving</strong>,
+  sign-in, outbox flush, server event id, <code>/me</code> totals, the officer's SOS queue, a delivered position
+  report, PIN set + PIN sign-in, <strong>an officer sign-in reading the register while a tourist token was
+  refused it with 403</strong>, a dead-backend retry, and an
+  on-device future-risk summary that the authority stores but never turns into an incident).</li>
+<li>ML suite: <strong>179 tests, 0 failures</strong> (<code>python -m pytest ml/tests ml/future_risk/tests -q</code>) — 86 existing
+  plus <strong>93</strong> new. The new <code>ml/future_risk/tests/test_future_risk.py</code> rebuilds the label geometry from the
+  raw <code>full_data.mat</code>, re-derives the leakage checks, the calibration and the band rule, pins the
+  provenance (including the corrupt recording and the licence position), re-applies the
+  <strong>model-selection rule from <code>tuning.json</code></strong>, and asserts the app asset and the reference cases are
+  <strong>byte-identical</strong> to the pipeline's output.</li>
+<li>Export fidelity: <code>python ml/har_verify_export.py</code> → <strong>ALL PASS</strong> (max probability error 4.97e-07
+  activity, 4.74e-07 impact; 0 argmax mismatches). For the new model, <code>FutureRiskReferenceTest</code> is the
+  equivalent check and it runs inside <code>:app:testDebugUnitTest</code>.</li>
+<li>Training reproducibility: re-running <code>ml/har_train.py</code> reproduced identical metrics and regenerated
+  <code>har_activity_model.json</code> <strong>byte-identical</strong> to the shipped copy. Re-running
+  <code>ml/future_risk/train.py</code> this round reproduced every metric to the digit (PR-AUC 0.764569, trial
+  sensitivity 0.929577) and regenerated <code>future_risk_model.json</code> byte-identically.</li>
+<li>Instrumented suite: <strong>compile-checked only</strong> (<code>:app:compileDebugAndroidTestKotlin</code> successful) —
+  <strong>not executed</strong> (no device/emulator; <code>adb devices</code> empty).</li>
+<li>Debug APK: <strong>built successfully</strong>, <strong>20.33 MB</strong> (21,317,914 bytes), SHA-256
+  <code>F0786379EC1917F9004E03F72E9317FB0C0F97B4B7D4BF9F312A911D3BE5D239</code>, built with
+  <code>-PAUTHORITY_URL=http://192.168.1.102:8080</code> (present in the packaged dex) and declaring
+  <code>android:networkSecurityConfig</code> → <code>res/xml/network_security_config.xml</code>
+  (<code>cleartextTrafficPermitted="true"</code>), both confirmed by dumping the shipped manifest and resources.</li>
+</ul>
+<p>The <strong>149</strong> enumerated acceptance cases (with objective, expected, actual, result, evidence) and the
+<strong>25</strong> NOT-EXECUTED cases are in <code>docs/test_report.md</code>. The migration path is now proven twice: the
+Robolectric <code>RoomPersistenceTest</code> <strong>executes both migrations</strong> on a real SQLite database on the JVM (so
+the non-destructive claim runs in every build), while the instrumented <code>DatabaseMigrationTest</code> (v1→v2,
+v2→v3 and v1→v3) is compile-checked only because it needs a device. The full live-integration transcript
+is in §7.1 of that report.</p>
+<hr />
+<h2 id="10-files-created-modified-in-this-pass">10. Files created / modified in this pass</h2>
+<h3 id="new-android-main-source">New — Android main source</h3>
+<pre><code>app/src/main/java/com/touristsafety/app/ui/map/MercatorProjection.kt
+app/src/main/java/com/touristsafety/app/ui/map/TilePolicy.kt
+app/src/main/java/com/touristsafety/app/ui/components/OfflineOsmMap.kt
+app/src/main/java/com/touristsafety/app/ui/components/TileDiskCache.kt
+app/src/main/java/com/touristsafety/app/ui/components/DeviceLocation.kt
+app/src/main/java/com/touristsafety/app/geofencing/SampleAreas.kt
+app/src/main/java/com/touristsafety/app/domain/model/OutboxEvent.kt
+app/src/main/java/com/touristsafety/app/data/database/entity/OutboxEventEntity.kt
+app/src/main/java/com/touristsafety/app/data/database/dao/OutboxEventDao.kt
+app/src/main/java/com/touristsafety/app/data/mapper/OutboxEventMappers.kt
+app/src/main/java/com/touristsafety/app/data/repository/OutboxRepository.kt
+app/src/main/java/com/touristsafety/app/data/database/DatabaseMigrations.kt
+app/src/main/java/com/touristsafety/app/outbox/OutboxPayloads.kt
+app/src/main/java/com/touristsafety/app/outbox/SyncTransport.kt
+app/src/main/java/com/touristsafety/app/outbox/OutboxSyncer.kt
+app/src/main/java/com/touristsafety/app/watch/WatchUiState.kt
+app/src/main/java/com/touristsafety/app/watch/WatchHaptics.kt
+app/src/main/java/com/touristsafety/app/watch/AndroidWatchHaptics.kt
+app/src/main/java/com/touristsafety/app/watch/WatchController.kt
+app/src/main/java/com/touristsafety/app/ui/viewmodel/WatchViewModel.kt
+app/src/main/java/com/touristsafety/app/ui/screens/WatchScreen.kt
+app/src/main/java/com/touristsafety/app/diagnostics/CrashLog.kt               (crash recorder)
+app/src/main/java/com/touristsafety/app/ui/components/CrashReportDialog.kt   (on-launch report)
+app/src/main/java/com/touristsafety/app/motion/MotionFeatures.kt             (24 features, mirrors Python)
+app/src/main/java/com/touristsafety/app/motion/DecisionForest.kt             (JSON forest walker)
+app/src/main/java/com/touristsafety/app/motion/MovementModels.kt             (asset loader, FallPolicy)
+app/src/main/java/com/touristsafety/app/motion/MovementAnalyzer.kt           (windows + the three fall gates)
+app/src/main/java/com/touristsafety/app/motion/MotionSource.kt               (sensor abstraction)
+app/src/main/java/com/touristsafety/app/motion/SensorMotionSource.kt         (accelerometer + gyroscope)
+app/src/main/java/com/touristsafety/app/motion/MovementController.kt         (watch lifecycle)
+app/src/main/java/com/touristsafety/app/geofencing/ApproachRisk.kt           (published weights, ZoneHistory)
+app/src/main/java/com/touristsafety/app/geofencing/ApproachBriefing.kt       (which zone, and why that score)
+app/src/main/java/com/touristsafety/app/ui/components/MovementAndApproachCards.kt (the two new cards)
+app/src/main/java/com/touristsafety/app/authority/Json.kt                     (hand-rolled codec, JVM-safe)
+app/src/main/java/com/touristsafety/app/authority/AuthorityContract.kt
+app/src/main/java/com/touristsafety/app/authority/AuthorityApi.kt             (the wire codec)
+app/src/main/java/com/touristsafety/app/authority/AuthorityHttp.kt            (HttpURLConnection layer)
+app/src/main/java/com/touristsafety/app/authority/AuthorityClient.kt
+app/src/main/java/com/touristsafety/app/authority/AuthoritySessionStore.kt    (its own DataStore file)
+app/src/main/java/com/touristsafety/app/authority/AuthoritySyncTransport.kt   (+ SelectingSyncTransport)
+app/src/main/java/com/touristsafety/app/domain/model/EmergencyContact.kt
+app/src/main/java/com/touristsafety/app/data/database/entity/EmergencyContactEntity.kt
+app/src/main/java/com/touristsafety/app/data/database/dao/EmergencyContactDao.kt
+app/src/main/java/com/touristsafety/app/data/mapper/EmergencyContactMappers.kt
+app/src/main/java/com/touristsafety/app/data/repository/EmergencyContactRepository.kt
+app/src/main/java/com/touristsafety/app/ui/viewmodel/AuthorityViewModel.kt
+app/src/main/java/com/touristsafety/app/ui/viewmodel/EmergencyContactsViewModel.kt
+app/src/main/java/com/touristsafety/app/ui/screens/AuthorityScreen.kt
+app/src/main/java/com/touristsafety/app/ui/screens/EmergencyContactsScreen.kt
+
+# --- future-event risk model (on-device inference, this round) ---
+app/src/main/java/com/touristsafety/app/motion/FutureRiskFeatures.kt      (22 features, the forest contract)
+app/src/main/java/com/touristsafety/app/motion/FutureRiskModel.kt         (asset loader + calibration + factors)
+app/src/main/java/com/touristsafety/app/motion/FutureRiskAnalyzer.kt      (bands, staleness, insufficient data)
+app/src/main/java/com/touristsafety/app/motion/FutureRiskReporter.kt      (when a summary is shared, not streamed)
+app/src/main/java/com/touristsafety/app/ui/components/FutureRiskCardModel.kt (what the card may say — pure, testable)
+app/src/main/java/com/touristsafety/app/ui/components/FutureRiskCard.kt   (thin renderer over that model)
+
+# --- LAN cleartext policy (this round) ---
+app/src/main/res/xml/network_security_config.xml                          (cleartextTrafficPermitted for the plain-HTTP authority)
+</code></pre>
+<h3 id="modified-android-main-source">Modified — Android main source</h3>
+<pre><code>app/src/main/java/com/touristsafety/app/ui/components/SafetyMap.kt            (trail, FollowLatestFix, crash guard)
+app/src/main/java/com/touristsafety/app/ui/components/OfflineOsmMap.kt        (blue marker, zoom 17, bounded tiles, OSM default)
+app/src/main/java/com/touristsafety/app/ui/components/DeviceLocation.kt       (last-known fix)
+app/src/main/java/com/touristsafety/app/ui/map/TilePolicy.kt                  (providersToTry fail-over; OSM first, CARTO refused)
+app/src/main/java/com/touristsafety/app/ui/theme/Color.kt                     (UserMarkerAccent → blue)
+app/src/main/java/com/touristsafety/app/MainActivity.kt                       (crash dialog host)
+app/src/main/java/com/touristsafety/app/TouristSafetyApp.kt                   (CrashLog.install)
+app/src/main/java/com/touristsafety/app/ui/screens/TrackingScreen.kt          (trail, follow toggle, MC/DIST pill, new cards)
+app/src/main/java/com/touristsafety/app/ui/screens/GeoFenceEditorScreen.kt    (opens on the user; typed corners)
+app/src/main/java/com/touristsafety/app/ui/viewmodel/GeoFenceEditorViewModel.kt (addVertexManually, saved zones)
+app/src/main/java/com/touristsafety/app/ui/screens/ManageZonesScreen.kt       (sample-areas button)
+app/src/main/java/com/touristsafety/app/ui/viewmodel/ManageZonesViewModel.kt  (addSampleAreas)
+app/src/main/java/com/touristsafety/app/tracking/TrackingController.kt
+app/src/main/java/com/touristsafety/app/tracking/LocationTrackingService.kt
+app/src/main/java/com/touristsafety/app/ui/viewmodel/HomeViewModel.kt
+app/src/main/java/com/touristsafety/app/ui/screens/HomeScreen.kt
+app/src/main/java/com/touristsafety/app/ui/viewmodel/TrackingViewModel.kt     (movement, alertHistory, approachBriefing)
+app/src/main/java/com/touristsafety/app/watch/WatchController.kt              (re-read after flush; sticky outcome)
+app/src/main/java/com/touristsafety/app/data/database/AppDatabase.kt          (VERSION 1 → 2 → 3)
+app/src/main/java/com/touristsafety/app/AppContainer.kt                       (motionSource, movementController, authority client + transport selector, contacts)
+app/src/main/java/com/touristsafety/app/ui/viewmodel/ViewModelFactory.kt
+app/src/main/java/com/touristsafety/app/navigation/AppNavigation.kt           (WATCH, AUTHORITY, CONTACTS routes)
+app/src/main/AndroidManifest.xml                                              (VIBRATE)
+# --- this round: the future-event model ---
+app/src/main/java/com/touristsafety/app/motion/DecisionForest.kt              (optional expectedFeatures: a 22-feature model loads without weakening the 24-feature check)
+app/src/main/java/com/touristsafety/app/motion/MovementController.kt          (futureRiskModel = null by default; one sensor subscription feeds both models)
+app/src/main/java/com/touristsafety/app/AppContainer.kt                       (loads future_risk_model.json, wires the analyzer + reporter)
+app/src/main/java/com/touristsafety/app/ui/viewmodel/ViewModelFactory.kt      (passes the reporter through)
+app/src/main/java/com/touristsafety/app/ui/viewmodel/TrackingViewModel.kt     (exposes futureRisk)
+app/src/main/java/com/touristsafety/app/ui/screens/TrackingScreen.kt          (renders FutureRiskCard beside the movement/approach cards)
+app/src/main/java/com/touristsafety/app/domain/model/OutboxEvent.kt           (+ OutboxKind.RISK, OutboxOrigin.ON_DEVICE_MODEL)
+app/src/main/java/com/touristsafety/app/outbox/OutboxPayloads.kt              (+ FutureRiskSummary payload + dedupe key)
+# --- this round: the LAN cleartext policy ---
+app/src/main/AndroidManifest.xml                                              (+ android:networkSecurityConfig)
+</code></pre>
+<h3 id="assets-shipped-models-new">Assets (shipped models, new)</h3>
+<pre><code>app/src/main/assets/har_activity_model.json        (262.4 KB — 32-tree forest, 24 features)
+app/src/main/assets/har_fall_model.json            ( 58.3 KB — 40-tree impact detector)
+app/src/main/assets/har_activity_model_spec.json   ( 3.5 KB — model card data)
+app/src/main/assets/future_risk_model.json         (  1.88 MB — 120-tree future-event forest, 22 features,
+                                                    Platt calibration, band thresholds, feature stats)
+</code></pre>
+<h3 id="tests">Tests</h3>
+<pre><code>NEW  app/src/test/java/com/touristsafety/app/ui/map/MercatorProjectionTest.kt
+NEW  app/src/test/java/com/touristsafety/app/ui/map/TilePolicyTest.kt
+NEW  app/src/test/java/com/touristsafety/app/ui/components/TileDiskCacheTest.kt
+NEW  app/src/test/java/com/touristsafety/app/geofencing/SampleAreasTest.kt
+NEW  app/src/test/java/com/touristsafety/app/outbox/OutboxQueueTest.kt
+NEW  app/src/test/java/com/touristsafety/app/outbox/OutboxPayloadsTest.kt
+NEW  app/src/test/java/com/touristsafety/app/outbox/FakeSyncTransport.kt
+NEW  app/src/test/java/com/touristsafety/app/watch/WatchControllerTest.kt
+NEW  app/src/test/java/com/touristsafety/app/watch/SosDeliveryStateTest.kt               (ordering rule)
+NEW  app/src/test/java/com/touristsafety/app/motion/ForestReferenceTest.kt              (shipped asset vs scikit-learn)
+NEW  app/src/test/java/com/touristsafety/app/motion/MovementAnalyzerTest.kt
+NEW  app/src/test/java/com/touristsafety/app/motion/MovementControllerTest.kt
+NEW  app/src/test/java/com/touristsafety/app/motion/MotionTestFixtures.kt
+NEW  app/src/test/java/com/touristsafety/app/geofencing/ApproachRiskTest.kt
+NEW  app/src/test/java/com/touristsafety/app/geofencing/ApproachBriefingTest.kt
+NEW  app/src/test/resources/har_activity_reference_cases.json                           (real windows + sklearn probs)
+NEW  app/src/test/resources/har_fall_reference_cases.json
+NEW  app/src/test/java/com/touristsafety/app/authority/JsonTest.kt                        (9 — the codec)
+NEW  app/src/test/java/com/touristsafety/app/authority/AuthorityApiTest.kt                (17 — the wire codec)
+NEW  app/src/test/java/com/touristsafety/app/authority/AuthoritySyncTransportTest.kt      (15 — retry/reject rules)
+NEW  app/src/test/java/com/touristsafety/app/authority/AuthorityHttpServerTest.kt         (10 — real socket, hand-rolled HTTP/1.1 server)
+NEW  app/src/test/java/com/touristsafety/app/authority/AuthorityLiveBackendTest.kt        (4 — opt-in, needs a running server)
+NEW  app/src/test/java/com/touristsafety/app/data/repository/EmergencyContactRepositoryTest.kt (7)
+MOD  app/src/test/java/com/touristsafety/app/data/database/RoomPersistenceTest.kt          (version contract + executes both migrations)
+MOD  app/src/androidTest/java/com/touristsafety/app/data/database/DatabaseMigrationTest.kt (NEW in an earlier round; v2→v3 and v1→v3 added here)
+MOD  app/src/test/java/com/touristsafety/app/outbox/OutboxPayloadsTest.kt                 (5 → 10: contacts, missing-fix, position payload + dedupe)
+MOD  app/src/test/java/com/touristsafety/app/ui/viewmodel/GeoFenceEditorViewModelTest.kt  (typed corners, refused duplicate)
+MOD  app/src/test/java/com/touristsafety/app/testing/TestSupport.kt                      (awaitUntil: drain removed)
+MOD  app/src/test/java/com/touristsafety/app/ui/map/TilePolicyTest.kt                    (18 → 21: OSM default, CARTO refused, concurrency cap)
+NEW  app/src/main/java/com/touristsafety/app/tracking/PositionReporter.kt                 (throttled real-GPS position queue)
+NEW  app/src/test/java/com/touristsafety/app/tracking/PositionReporterTest.kt             (6 — queueing, simulated/out-of-range refusal, the no-address gate)
+NEW  app/src/test/java/com/touristsafety/app/tracking/PositionReportPolicyTest.kt         (6 — interval + distance rules)
+MOD  app/src/main/java/com/touristsafety/app/outbox/OutboxPayloads.kt                     (+POSITION payload + dedupe key)
+MOD  app/src/main/java/com/touristsafety/app/authority/AuthorityClient.kt / AuthorityApi.kt (PIN sign-in, set-PIN, latestPosition)
+MOD  app/src/main/java/com/touristsafety/app/ui/screens/AuthorityScreen.kt                 (PIN toggle, set-PIN, SOS ack + position rows)
+MOD  app/src/main/java/com/touristsafety/app/ui/screens/HomeScreen.kt                      (GPS status card, authority upload card)
+MOD  app/src/main/java/com/touristsafety/app/ui/screens/{Settings,Simulation,GeoFenceEditor,ManageZones,Watch,EmergencyContacts}Screen.kt (responsive action/chip rows)
+# --- future-event model tests (93 new across 8 classes, plus 1 live E2E case, this round) ---
+MOD  app/src/test/java/com/touristsafety/app/authority/AuthorityLiveBackendTest.kt        (+1 — a risk summary reaches the authority and raises no SOS; now 5 tests)
+NEW  app/src/test/java/com/touristsafety/app/motion/FutureRiskFeaturesTest.kt            (13 — the 22 features, index by index)
+NEW  app/src/test/java/com/touristsafety/app/motion/FutureRiskReferenceTest.kt           (6 — the SHIPPED asset vs scikit-learn on 16 real windows)
+NEW  app/src/test/java/com/touristsafety/app/motion/FutureRiskAnalyzerTest.kt            (18 — bands, staleness, insufficient/implausible data, factors)
+NEW  app/src/test/java/com/touristsafety/app/motion/FutureRiskReportPolicyTest.kt        (10 — when a summary is shared)
+NEW  app/src/test/java/com/touristsafety/app/motion/FutureRiskReporterTest.kt            (12 — real SQLite outbox, dedupe, offline recovery)
+NEW  app/src/test/java/com/touristsafety/app/motion/FutureRiskMovementIntegrationTest.kt (8 — one sensor feed, no alarm, no SOS)
+NEW  app/src/test/java/com/touristsafety/app/motion/FutureRiskTestArtefact.kt            (helper: builds a test artefact)
+NEW  app/src/test/java/com/touristsafety/app/outbox/FutureRiskPayloadTest.kt             (8 — the RISK wire contract)
+NEW  app/src/test/java/com/touristsafety/app/ui/components/FutureRiskCardModelTest.kt    (18 — what the card may and may not say)
+NEW  app/src/test/resources/future_risk_reference_cases.json                             (16 real windows + sklearn probabilities)
+# --- LAN cleartext policy (this round) ---
+NEW  app/src/test/java/com/touristsafety/app/NetworkSecurityConfigTest.kt                 (3 — manifest must point at a cleartext-permitting profile)
+</code></pre>
+<h3 id="ml-module-new">ML module (new)</h3>
+<pre><code>ml/common.py  ml/preprocess.py  ml/eda.py  ml/train.py  ml/evaluate.py  ml/predict.py
+ml/requirements.txt  ml/run_all.ps1
+ml/data/README.md  ml/data/make_synthetic_fixture.py  ml/data/synthetic_sample/**
+ml/tests/conftest.py  ml/tests/test_pipeline.py
+ml/outputs/**  (clean/, eda/, train/, eval/, predict/)
+ml/models/isolation_forest.joblib  ml/models/model_meta.json  ml/models/split.json
+
+# --- movement / impact pipeline (UCI HAR, supervised) ---
+ml/har_preprocess.py            (extract, integrity-check, subject-disjoint split)
+ml/har_train.py                 (24-feature activity forest, per-class report, figures, export)
+ml/har_fall.py                  (synthetic-impact detector + shuffled-label control)
+ml/har_verify_export.py         (exported JSON vs scikit-learn: ALL PASS)
+ml/tests/test_har_models.py     (21 contract tests for the shipped artefacts)
+ml/outputs/har/clean/**         (metadata, class balance, subject split)
+ml/outputs/har/train/**         (reports, metrics CSV, 5 figures, model JSON, spec)
+ml/outputs/har/fall/**          (report, ROC/confusion/signal figures, model JSON)
+
+# --- remaining datasets + history (this round) ---
+ml/osm_eda.py                   (real OpenStreetMap EDA via the Overpass API; NOT_RUN on total failure)
+ml/weather_eda.py               (real weather EDA — Open-Meteo by default, OpenWeatherMap with a key)
+ml/har_eda.py                   (UCI HAR figure set)
+ml/history.py                   (historical trajectory + temporal + zone-crossing trends)
+ml/transport_mode.py            (supervised transport-mode model — NOT a risk model)
+ml/tests/test_osm_eda.py (12)  ml/tests/test_weather_eda.py (11)
+ml/tests/test_history.py (13)  ml/tests/test_transport_mode.py (8)
+ml/outputs/osm/**  ml/outputs/weather/**  ml/outputs/har/eda/**  ml/outputs/history/**  ml/outputs/transport/**
+
+# --- supervised FUTURE-event model (this round) ---
+ml/future_risk/__init__.py
+ml/future_risk/config.py        (the selected hyper-parameters, the size budget, the paths, the 22-feature order)
+ml/future_risk/features.py      (the 22 features + their human labels and formulas — the reference definition)
+ml/future_risk/dataset.py       (raw-trial reader, sanitiser, impact finder, window cutter, provenance writer)
+ml/future_risk/train.py         (subject split, training, calibration, bands, metrics, figures, export)
+ml/future_risk/tune.py          (65-config validation search under the deployment size budget)
+ml/future_risk/tests/conftest.py        ml/future_risk/tests/test_future_risk.py (93)
+ml/data/unimib/README section   (ml/data/README.md §6: the dataset, its licence position, the download steps)
+ml/outputs/future_risk/**       (windows.npz, dataset_provenance.json, metrics.json, tuning.json,
+                                 calibration_reliability.csv, test_predictions.csv, 6 figures,
+                                 future_risk_model.json, future_risk_reference_cases.json)
+ml/run_all.ps1                  (MOD: + the `-FutureRisk` stage and the new test directory)
+ml/data/README.md               (MOD: §6 documents UniMiB SHAR, its licence position and the download steps)
+</code></pre>
+<h3 id="authority-backend-new">Authority backend (new)</h3>
+<pre><code>backend/README.md                 (how to run it, the API, the sync contract, the payload rules)
+backend/run.py                    (entry point: --host --port --database)
+backend/pytest.ini
+backend/tsm/__init__.py           (config: token TTL, seed accounts, demo ids, version)
+backend/tsm/app.py                (Flask app factory, error envelope, static dashboard)
+backend/tsm/api.py                (routes, auth, sync results, batch/page ceilings)
+backend/tsm/payloads.py           (per-kind validators the phone's bytes must satisfy)
+backend/tsm/db.py                 (idempotent SQLite schema, append-only events)
+backend/tsm/security.py           (scrypt salt+digest; nothing recoverable stored)
+backend/tsm/seed.py               (first-start credentials, written once)
+backend/tsm/clock.py              (injectable clock, so expiry is testable)
+backend/tsm/static/index.html · app.js · style.css   (the operator dashboard)
+backend/tests/conftest.py         (FrozenClock, app_factory, short_ttl)
+backend/tests/test_payloads.py (42) · test_authority.py (33) · test_sync.py (29)
+backend/tests/test_auth.py (26) · test_pin.py (18) · test_app.py (16)
+backend/tests/test_contacts.py (15) · test_security.py (13)
+backend/tests/test_risk.py (28)   (the RISK payload: ingest, idempotency, read-back, 12 rejections, prediction-is-not-an-incident)
+backend/tests/test_registration.py (45)   (self-registration: DB-minted unique ids, hashed PIN / no secret returned,
+                                          validation, duplicate phone 409, no privilege escalation, authenticated register
+                                          listing, registration-vs-tracking-vs-alert separation)
+backend/verify_integration.py     (41-check acceptance run against a real subprocess server)
+backend/var/                      (generated: authority.db + DEV_CREDENTIALS.txt — not committed)
+</code></pre>
+<h3 id="authority-backend-added-this-round-predictions-not-incidents">Authority backend, added this round (predictions, not incidents)</h3>
+<pre><code>MOD  backend/tsm/payloads.py      (+ the RISK kind: band ceiling, nullable probability, horizon ceiling,
+                                   5-factor ceiling, data-quality block — 12 rejection paths covered by tests)
+MOD  backend/tsm/db.py            (+ the risk_assessments table and its two indexes)
+MOD  backend/tsm/api.py           (+ prediction ingest, /me.latestRisk, /authority/risk, per-tourist history,
+                                   overview riskAssessments/riskElevated; `state` deliberately ignores risk)
+MOD  backend/tsm/static/index.html (+ the &quot;Future-risk predictions&quot; panel, a Risk (model) column, a RISK filter)
+MOD  backend/tsm/static/app.js    (+ riskBandPill/renderRisk, risk tiles, risk cell, non-incident wording)
+MOD  backend/tsm/static/style.css (+ .tile.warn, td.factors)
+NEW  backend/tests/test_risk.py   (28)
+MOD  backend/tests/test_payloads.py (the kinds test now names all five the phone can send)
+MOD  backend/verify_integration.py (the accepted batch now carries a RISK summary too, so the acceptance
+                                   run proves a prediction reaches /authority/risk and raises no SOS —
+                                   26 → 33 checks)
+</code></pre>
+<h3 id="self-service-tourist-registration-added-this-round">Self-service tourist registration, added this round</h3>
+<pre><code>NEW  backend/tsm/registration.py   (pure validation + the DB-backed Tourist-ID minting sequence)
+MOD  backend/tsm/db.py             (+ the tourist_id_sequence table; + the nullable tourists.registration_source column)
+MOD  backend/tsm/api.py            (+ POST /auth/register; registered_tourist_json; the enriched
+                                   /authority/tourists register; the RISK insert moved inside its event transaction)
+MOD  backend/tsm/static/index.html (+ the panel renamed to &quot;Registered Tourists&quot;, new columns: Tourist ID, name,
+                                   registration date + source, registration status, tracking status)
+MOD  backend/tsm/static/app.js     (+ renderTourists now reads /authority/tourists; registrationLabel/trackingLabel;
+                                   the tile relabelled; refresh() fetches the register)
+NEW  backend/tests/test_registration.py (45)
+MOD  backend/tests/test_app.py     (the schema list now names tourist_id_sequence)
+MOD  backend/verify_integration.py (33 → 41 checks: self-register, the minted id, no token/secret, sign-in with
+                                   id + PIN, duplicate phone 409, role escalation 400, the officer's register shows
+                                   it with no position, and it survives a restart)
+NEW  app/src/main/java/com/touristsafety/app/authority/RegistrationForm.kt
+                                   (pure client validation + RegistrationDraft/RegistrationValidation)
+MOD  app/src/main/java/com/touristsafety/app/authority/AuthorityContract.kt (+ REGISTER, AuthorityRegistration)
+MOD  app/src/main/java/com/touristsafety/app/authority/AuthorityApi.kt      (+ registerBody / parseRegistration)
+MOD  app/src/main/java/com/touristsafety/app/authority/AuthorityClient.kt   (+ register(), unauthenticated)
+MOD  app/src/main/java/com/touristsafety/app/ui/viewmodel/AuthorityViewModel.kt (+ registration state, register(), clearRegistration())
+MOD  app/src/main/java/com/touristsafety/app/ui/screens/AuthorityScreen.kt  (+ the Sign in / Register as tourist modes,
+                                   the form with add-and-remove contacts, and the success card with the copy button)
+NEW  app/src/test/java/com/touristsafety/app/authority/RegistrationFormTest.kt (13)
+NEW  app/src/test/java/com/touristsafety/app/ui/viewmodel/AuthorityViewModelTest.kt (11)
+MOD  app/src/test/java/com/touristsafety/app/authority/AuthorityApiTest.kt         (20 → 24)
+MOD  app/src/test/java/com/touristsafety/app/authority/AuthorityHttpServerTest.kt  (10 → 12, incl. a real-socket registration)
+MOD  app/src/test/java/com/touristsafety/app/authority/AuthorityLiveBackendTest.kt (5 → 6: register → sign in → dashboard)
+</code></pre>
+<h3 id="two-role-sign-in-and-the-dead-button-fix-added-this-pass">Two-role sign-in and the dead-button fix, added this pass</h3>
+<pre><code>NEW  app/src/main/java/com/touristsafety/app/ui/screens/WelcomeScreen.kt     (the role chooser)
+NEW  app/src/main/java/com/touristsafety/app/ui/screens/TouristAuthScreen.kt (tourist sign-in + create account + success card)
+NEW  app/src/main/java/com/touristsafety/app/ui/screens/OfficerScreen.kt     (officer sign-in + the register console)
+NEW  app/src/main/java/com/touristsafety/app/ui/viewmodel/OfficerViewModel.kt
+MOD  app/build.gradle.kts            (+ BuildConfig.DEFAULT_AUTHORITY_URL from -PAUTHORITY_URL / TSM_AUTHORITY_URL / local.properties)
+MOD  app/src/main/java/com/touristsafety/app/AppContainer.kt (start() seeds the default address; uses createAuthoritySessionStore)
+MOD  app/src/main/java/com/touristsafety/app/authority/AuthorityContract.kt  (+ AUTHORITY_TOURISTS, AuthorityConnectionState,
+                                     OfficerSession, AuthorityTouristRow; AuthorityTouristRow split into three status claims)
+MOD  app/src/main/java/com/touristsafety/app/authority/AuthoritySessionStore.kt (+ currentOfficer/officerSession/saveOfficerLogin/
+                                     clearOfficerLogin/seedBaseUrlIfUnset; separate officer keys; takes a DataStore, with
+                                     createAuthoritySessionStore(context) as the production factory)
+MOD  app/src/main/java/com/touristsafety/app/authority/AuthorityApi.kt       (+ parseTourists / toTouristRowOrNull)
+MOD  app/src/main/java/com/touristsafety/app/authority/AuthorityClient.kt    (+ authorityTourists(token))
+MOD  app/src/main/java/com/touristsafety/app/authority/RegistrationForm.kt   (+ RegistrationFieldErrors, fieldErrors(), outstanding())
+MOD  app/src/main/java/com/touristsafety/app/ui/viewmodel/AuthorityViewModel.kt (+ connection StateFlow, probeConnection())
+MOD  app/src/main/java/com/touristsafety/app/ui/viewmodel/HomeViewModel.kt   (+ authorityClient, signOut(onComplete))
+MOD  app/src/main/java/com/touristsafety/app/ui/viewmodel/ViewModelFactory.kt (+ OfficerViewModel, authorityClient for HomeViewModel)
+MOD  app/src/main/java/com/touristsafety/app/ui/screens/AuthorityScreen.kt   (now the advanced backend/queue/profile screen; sign-in
+                                     and registration removed — this is the file that held the dead buttons)
+MOD  app/src/main/java/com/touristsafety/app/ui/screens/HomeScreen.kt        (the upload card became a &quot;Your account&quot; card —
+                                     the raw backend address left the tourist path)
+MOD  app/src/main/java/com/touristsafety/app/navigation/AppNavigation.kt     (WELCOME / TOURIST_AUTH / OFFICER routes, a
+                                     session-aware start gate, no chrome on onboarding; cloud icon removed from the top bar)
+MOD  app/src/main/java/com/touristsafety/app/ui/screens/SettingsScreen.kt    (&quot;Connection &amp; sign-in&quot; → &quot;Backend connection (advanced)&quot;)
+NEW  app/src/test/java/com/touristsafety/app/ui/viewmodel/OfficerViewModelTest.kt (10)
+NEW  app/src/test/java/com/touristsafety/app/authority/AuthoritySessionStoreTest.kt (8, real on-disk DataStore, no Robolectric)
+MOD  app/src/test/java/com/touristsafety/app/authority/RegistrationFormTest.kt      (13 → 18)
+MOD  app/src/test/java/com/touristsafety/app/authority/AuthorityApiTest.kt          (24 → 28)
+MOD  app/src/test/java/com/touristsafety/app/authority/AuthorityHttpServerTest.kt   (12 → 14)
+MOD  app/src/test/java/com/touristsafety/app/authority/AuthorityLiveBackendTest.kt  (6 → 7: the officer console + the 403)
+MOD  app/src/test/java/com/touristsafety/app/testing/Fakes.kt (InMemoryAuthoritySessionStore implements the extended interface)
+MOD  README.md · docs/test_report.md · docs/final_project_report.md · docs/architecture.md · docs/progress_log.md
+                                     (the flow, the route map, the measured counts and the APK hash updated; the .html mirrors
+                                     regenerated from the .md sources)
+</code></pre>
+<p>No backend file changed this pass: <code>GET /api/v1/authority/tourists</code> already required <code>require_auth("authority")</code>,
+so the officer console reads the existing route and the role boundary is unchanged server-side.</p>
+<h3 id="docs-scripts">Docs &amp; scripts</h3>
+<pre><code>docs/architecture.md            (existing, updated)
+docs/dataset_and_eda.md         (new)
+docs/model_card.md              (new — GeoLife trajectory anomaly)
+docs/model_card_movement.md     (new — activity + impact models, metrics, confusion matrices)
+docs/google_maps_setup.md       (new — how to supply your own Google Maps key)
+docs/test_report.md             (new)
+docs/final_project_report.md    (new — this file)
+docs/progress_log.md            (updated)
+README.md                       (updated)
+build-and-install.bat           (new — one-click build + install)
+docs/future_risk_prediction.md  (new — model card + dataset provenance for the future-event model)
+</code></pre>
+<hr />
+<h2 id="11-exact-commands">11. Exact commands</h2>
+<pre><code class="language-powershell"># ---- Android ----
+cd D:\TouristSafetyMonitoring-src
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:testDebugUnitTest&quot;        # 548 (7 skipped)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:assembleDebug&quot;             # APK
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:compileDebugAndroidTestKotlin&quot;
+# with a device/emulator:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:connectedDebugAndroidTest&quot;
+
+# ship a first-launch authority address (optional; never overwrites a chosen one)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:assembleDebug&quot; &quot;-PAUTHORITY_URL=http://192.168.1.102:8080&quot;
+
+# optional Google Maps key (not committed; passed for one build only)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:assembleDebug&quot; &quot;-PMAPS_API_KEY=&lt;key&gt;&quot;
+
+# ---- authority backend + dashboard ----
+python backend\run.py            # dashboard http://127.0.0.1:8080/  · health /api/v1/health
+python backend\run.py --host 0.0.0.0   # reachable from a phone on the same network
+python -m pytest backend\tests -q        # 265 pass
+python backend\verify_integration.py     # 41/41 PASS against a real subprocess server
+
+# ---- optional: drive the production Kotlin client at a running server ----
+python backend\run.py --port 8080        # terminal 1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:testDebugUnitTest&quot; `
+  &quot;--tests&quot; &quot;com.touristsafety.app.authority.AuthorityLiveBackendTest&quot; `
+  &quot;-Dtsm.e2e.baseUrl=http://127.0.0.1:8080&quot; `
+  &quot;-Dtsm.e2e.credentials=D:\TouristSafetyMonitoring-src\backend\var\DEV_CREDENTIALS.txt&quot;
+
+# ---- install ----
+D:\AndroidTools\Sdk\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk
+
+# ---- ML ----
+cd ml
+pip install -r requirements.txt
+python -m pytest tests -q                                                                         # 86 pass
+python -m pytest ../ml/tests ../ml/future_risk/tests -q                                           # 179 pass (from the repo root)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_all.ps1                                 # full pipeline
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_all.ps1 -Network -Transport              # + OSM/weather fetch + transport model
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_all.ps1 -FutureRisk                      # + the future-event model (rewrites the app asset)
+python osm_eda.py                                                                                 # real OSM EDA (Overpass)
+python weather_eda.py                                                                             # real weather (Open-Meteo / OpenWeatherMap)
+python history.py                                                                                 # trajectory + zone-crossing trends
+python transport_mode.py                                                                          # supervised transport-mode model
+python future_risk/train.py                                                                       # FUTURE fall-impact model -&gt; ml/outputs/future_risk/ + app assets
+python future_risk/tune.py                                                                        # the 65-config validation search under the size budget
+python har_train.py                                                                               # activity model + figures
+python har_fall.py                                                                                # impact detector
+python har_verify_export.py                                                                       # ALL PASS
+python predict.py --plt &quot;data\geolife\Geolife Trajectories 1.3\Data\000\Trajectory\20081023025304.plt&quot;
+</code></pre>
+<p>The APK is at <code>app\build\outputs\apk\debug\app-debug.apk</code> (20.33 MB / 21,317,914 bytes, SHA-256
+<code>F0786379EC1917F9004E03F72E9317FB0C0F97B4B7D4BF9F312A911D3BE5D239</code>; copies placed in the project root,
+on the Desktop and in <code>Downloads</code> as <code>app-debug.apk</code>). It is built with
+<code>-PAUTHORITY_URL=http://192.168.1.102:8080</code>, so a first launch on this machine's Wi-Fi is already pointed
+at the server; the address can still be changed in <em>Settings → Backend connection (advanced)</em> and a
+build-time default never overwrites a chosen one. Install it <strong>over</strong> the existing app
+(<code>adb install -r</code>, or tap the APK without uninstalling): the signing key and package are unchanged, so the
+saved address and sessions survive — and it is the only build that contains the cleartext fix of §7.13.</p>
+<hr />
+<h2 id="12-limitations-blockers-stated-not-hidden">12. Limitations &amp; blockers (stated, not hidden)</h2>
+<ol>
+<li><strong>No device/emulator here.</strong> Map tile rendering, the crash fix, the new movement/approach cards,
+   live sensor inference, the backend/contacts screens, the new <strong>Welcome</strong>, <strong>tourist sign-in /
+   create-account</strong> and <strong>officer console</strong> screens,
+   and all <code>androidTest</code> sources (including
+   the migration test) are <strong>NOT EXECUTED</strong> — compile- and JVM-checked only. <code>adb devices</code> is empty.
+   Recorded as INST-16…INST-25 in <code>docs/test_report.md</code>.</li>
+<li><strong>The backend exists, but the device's own path to it is unproven.</strong> <code>backend/</code> is a working Flask +
+   SQLite service with an operator dashboard, and the production Kotlin client was driven against it on
+   the JVM (41/41 acceptance + 7/7 live). What has <strong>not</strong> been done here is the same flow <em>from a
+   device</em> — its <code>HttpURLConnection</code>, emulator loopback <code>10.0.2.2</code> / Wi-Fi routing, and the Compose
+   sign-in, create-account, role-chooser and officer-console screens (INST-20, INST-21, INST-24,
+   INST-25). Routine <code>POSITION</code> reporting now exists
+   (behind an explicit
+   interval/distance policy) but its on-device GPS has not been run here. <strong>No SOS is ever sent
+   automatically.</strong></li>
+<li><strong>The movement impact detector uses no real falls.</strong> UCI HAR contains none, so that detector's
+   positives are <strong>synthesised impacts injected into real recordings</strong>; its 0.9999 ROC-AUC measures
+   detection of that injected signature, <strong>not</strong> clinical fall detection. Controls are in
+   <code>docs/model_card_movement.md</code>. <strong>This is no longer true of the future-risk model</strong>: §7.10's predictor is
+   trained on <strong>real recorded falls</strong>, and its 0.764569 PR-AUC / 0.929577 trial sensitivity are real
+   held-out numbers — but they are still <em>fall</em> numbers from a lab, not tourist-incident numbers, and it is
+   <strong>not a deployment-ready alarm</strong> (5.09 false alarms per minute of ordinary activity; see item 10).</li>
+<li><strong>GeoLife has no real anomaly labels.</strong> Accuracy/F1 against real anomalies is impossible; only an
+   injection-based ROC-AUC (0.8922) is reported, and the trajectory model is unsupervised by design. The
+   output is a <em>movement anomaly score</em>, never danger.</li>
+<li><strong>The approach-risk score is a weighted checklist, not a fitted model.</strong> Published weights,
+   unit-tested, and labelled as such in the UI. It has no labelled outcome data to learn from.</li>
+<li><strong>Geographic bias</strong> in the GeoLife data (dominated by a few Beijing users), and <strong>placement bias</strong> in
+   UCI HAR (30 volunteers, waist-mounted phone) mean "normal" is region-, person- and posture-specific.</li>
+<li><strong>The key-less map is not Google Maps.</strong> Real Google tiles require the user's own API key
+   (<code>docs/google_maps_setup.md</code>); without one, the app uses key-free basemaps (OpenStreetMap by default,
+   with Esri and OpenTopoMap as fallbacks). CARTO Voyager was tried and removed because it now serves a
+   watermark instead of a map, so it is not offered at all.</li>
+<li><strong>PDF/HTML are best-effort exports.</strong> Every document has a sibling <code>.html</code> and <code>.pdf</code> in <code>docs\</code>
+   (<code>README.html</code>/<code>README.pdf</code> live in the repository root) (Markdown → HTML via <code>python-markdown</code> →
+   PDF via headless Microsoft Edge <code>--print-to-pdf</code>). <strong>All companions were regenerated on 2026-10-18</strong>,
+   including the new <code>docs/future_risk_prediction.html</code>/<code>.pdf</code>, so they match the Markdown of this round.
+   Prefer the Markdown as the source of truth. The PDFs embed the model-card figures from
+   <code>ml/outputs/har/**</code>, so the <code>.md</code> and the figures must be copied together.</li>
+<li>This is a <strong>monitoring aid</strong>, not an emergency service: it does not contact anyone automatically.</li>
+<li><strong>The future-risk model is not a deployable fall alarm.</strong> Measured on held-out subjects it raises
+    <strong>5.09 false alarms per minute</strong> of ordinary activity at the app's cadence (16.30/min at the raw
+    window stride), concentrated in <em>jumping</em> (0.161), <em>sitting down</em> (0.156) and <em>lying down</em> (0.127); its
+    mid-range probabilities (0.2–0.4) are over-confident; it was trained on 30 healthy adults in a lab
+    carrying or pocketing a phone, never on a tourist outdoors; it forecasts <strong>one second</strong> ahead and
+    nothing longer; and it <strong>cannot distinguish a dropped phone from a falling person</strong> (no phone-drop
+    activity exists in the dataset, so that failure mode is untested). It is <strong>not the best model in the
+    repository</strong> — <code>hist_gradient_boosting</code> reaches PR-AUC 0.8150 but cannot be walked on-device. A HIGH
+    band is an <strong>informational UI state</strong> and a queued summary: it raises <strong>no</strong> alarm, changes <strong>no</strong>
+    operational state, and <strong>never</strong> sends an SOS. Full detail in <code>docs/future_risk_prediction.md</code>.</li>
+<li><strong>The future-risk card has never been rendered on a screen.</strong> No device or emulator exists here, so
+    the Compose card, the real sensor→forest→card chain and the dashboard's new predictions panel are
+    <strong>NOT EXECUTED</strong> (INST-22). The wording is instead pinned by <code>FutureRiskCardModelTest</code> (18 tests) and
+    the inference by <code>FutureRiskReferenceTest</code>, which replays the shipped asset against scikit-learn's own
+    probabilities on 16 real held-out windows.</li>
+</ol>
+<hr />
+<h2 id="13-recommendations-next-steps">13. Recommendations / next steps</h2>
+<ol>
+<li>Install the APK on a physical phone and run INST-01…INST-21 (<code>docs/test_report.md</code>), especially
+   INST-16 (the reported crash), INST-17 (live sensor inference) and INST-20/INST-21 (the Authority
+   screen and the device's own path to the backend).</li>
+<li>Retrain the <strong>movement impact detector</strong> on real falls too (SisFall / MobiFall), or fold §7.10's
+   future-risk model into the reaction path once its false-alarm rate is acceptable — that is the single
+   change that would turn the remaining impact-detector numbers into a fall-detection claim. The
+   future-risk model already uses real falls (UniMiB SHAR), but it forecasts one second ahead rather than
+   detecting the impact.</li>
+<li>The authority endpoint now exists (<code>backend/</code>); the remaining work there is deployment, not a
+   feature: put it behind TLS and a real reverse proxy, move off the Flask dev server, back up the
+   SQLite file, and add online token revocation/rotation. Then decide a <strong>position-report frequency
+   policy</strong> so the dashboard's "latest position" tracks the tourist without draining the battery.</li>
+<li>Add a proper AVD/CI device so the instrumented suite (migration, persistence, UI) runs
+   automatically.</li>
+<li>Re-train the trajectory anomaly model on data representative of the deployment region before any
+   real use, and keep it strictly advisory alongside geo-fencing.</li>
+<li>Supply a Google Maps API key if the tool under test requires the real Google basemap (free tier,
+   ~2 minutes — <code>docs/google_maps_setup.md</code>).</li>
+</ol></body></html>

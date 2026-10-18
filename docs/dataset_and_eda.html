@@ -1,0 +1,437 @@
+<!doctype html><html><head><meta charset='utf-8'><title>dataset_and_eda</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="dataset-and-eda-ml-analysis-module">Dataset and EDA — <code>ml/</code> analysis module</h1>
+<p>This document describes the <strong>data-analysis / unsupervised anomaly-detection module</strong>
+that lives in <code>ml/</code> (a <em>supplement</em> to — never a replacement for — the app's
+deterministic geo-fencing in <code>app/</code>; the module does not touch <code>app/</code>).</p>
+<p>Everything below was <strong>measured</strong> by running the scripts in <code>ml/</code> against the real
+Microsoft GeoLife dataset on this machine and reading the produced CSV/JSON/PNG
+artifacts (see <code>ml/outputs/</code>). No number here is estimated, rounded up from a
+guess, or fabricated. Where something cannot be computed it is marked <strong>N/A</strong>.</p>
+<hr />
+<h2 id="1-dataset-microsoft-research-geolife-gps-trajectories-13">1. Dataset: Microsoft Research GeoLife GPS Trajectories 1.3</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Name</td>
+<td>Microsoft Research <strong>GeoLife GPS Trajectories 1.3</strong></td>
+</tr>
+<tr>
+<td>Authors</td>
+<td>Yu Zheng, Xing Xie, Wei-Ying Ma et al. (Microsoft Research Asia)</td>
+</tr>
+<tr>
+<td>Download page</td>
+<td>https://www.microsoft.com/en-us/download/details.aspx?id=52367</td>
+</tr>
+<tr>
+<td>Direct URL used</td>
+<td><code>https://download.microsoft.com/download/f/4/8/f4894aa5-fdbc-481e-9285-d5f8c4c4f039/Geolife%20Trajectories%201.3.zip</code></td>
+</tr>
+<tr>
+<td>Archive size (verified)</td>
+<td><strong>313,164,406 bytes</strong> (298.7 MB)</td>
+</tr>
+<tr>
+<td>Obtained in this environment</td>
+<td><strong>YES</strong> — downloaded and unzipped successfully</td>
+</tr>
+</tbody>
+</table>
+<h3 id="licence-terms">Licence / terms</h3>
+<p>The archive contains <strong>no <code>LICENSE</code>/<code>COPYING</code>/<code>README</code> file</strong> and the bundled
+<code>User Guide-1.3.pdf</code> states no explicit open-source licence. The only usage
+requirement stated is a <strong>citation request</strong> for the three GeoLife papers (WWW
+2009; UbiComp 2008; IEEE DEB 2010). The module therefore treats the data as
+<strong>research-use only</strong> and does not redistribute the raw archive. Full details,
+exact download/unzip commands and blockers are in <code>ml/data/README.md</code>.</p>
+<h3 id="measured-scale-verified">Measured scale (verified)</h3>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>User directories</td>
+<td><strong>182</strong></td>
+</tr>
+<tr>
+<td><code>.plt</code> trajectory files</td>
+<td><strong>18,670</strong></td>
+</tr>
+<tr>
+<td><code>labels.txt</code> (transportation-mode) files</td>
+<td><strong>69</strong></td>
+</tr>
+<tr>
+<td>Data lines (points), whole archive</td>
+<td><strong>24,876,978</strong></td>
+</tr>
+<tr>
+<td><code>User Guide</code> claim (for comparison)</td>
+<td>17,621 trajectories</td>
+</tr>
+</tbody>
+</table>
+<p>The guide claims 17,621 trajectories while the archive physically contains
+18,670 <code>.plt</code> files; <strong>both numbers are reported</strong> and the discrepancy is not
+hidden.</p>
+<hr />
+<h2 id="2-verified-plt-schema-measured-not-assumed">2. Verified <code>.plt</code> schema (measured, not assumed)</h2>
+<p>A <code>.plt</code> file is ASCII with <strong>6 header lines</strong> and (by default) CRLF endings:</p>
+<pre><code>Geolife trajectory
+WGS 84
+Altitude is in Feet
+Reserved 3
+0,2,255,My Track,0,0,2,8421376
+0
+</code></pre>
+<p>Each data line then has <strong>7 comma-separated tokens</strong> (the documentation says "6
+columns" because the date itself embeds a comma):</p>
+<pre><code>latitude,longitude,0,altitude,days_since_1899-12-30,YYYY-MM-DD,HH:MM:SS
+</code></pre>
+<p>Real example (user <code>000</code>):</p>
+<pre><code>39.984702,116.318417,0,492,39744.1201851852,2008-10-23,02:53:04
+</code></pre>
+<p>Verification on the real archive:</p>
+<ul>
+<li>60 randomly sampled files → <strong>all</strong> had exactly 6 header lines and <strong>0</strong>
+  malformed data lines (85,307 data lines checked).</li>
+<li>Full scan of all 18,670 files: <strong>24,876,978 rows parsed, 0 malformed, 0 header
+  anomalies</strong>. The two independent time encodings agree to within
+  <strong>4.79 × 10⁻⁶ s</strong> (Excel epoch <code>1899-12-30</code> + <code>days</code> vs. the <code>YYYY-MM-DD HH:MM:SS</code>
+  string).</li>
+<li><code>altitude</code> is declared "in Feet" but is <strong>unreliable</strong> (many zeros / large
+  values); the pipeline <strong>flags</strong> it but never relies on it.</li>
+</ul>
+<h3 id="critical-data-quirk">Critical data quirk</h3>
+<p><code>trajectory_id</code> (the <code>.plt</code> file stem) <strong>collides across users</strong>: 847 ids are
+shared by more than one user. Every grouping operation therefore uses the
+composite key</p>
+<pre><code>traj_uid = user_id | trajectory_id
+</code></pre>
+<p>Using the bare file name as a group key would silently merge different people's
+trajectories (a leakage bug). This is enforced in <code>ml/common.py::add_traj_uid</code>.</p>
+<hr />
+<h2 id="3-preprocessing-cleaning">3. Preprocessing / cleaning</h2>
+<p>Implemented in <code>ml/preprocess.py</code> (bulk parse + bulk clean, batched to fit
+7.9 GB RAM). Cleaning steps (from <code>common.clean_points</code>):</p>
+<ol>
+<li>drop rows with unparsable timestamps;</li>
+<li>drop out-of-range coordinates and null-island points;</li>
+<li>drop exact duplicate <code>(trajectory, timestamp)</code> rows (keep first);</li>
+<li>sort chronologically within each trajectory (<code>traj_uid</code>);</li>
+<li>split trajectories into segments at gaps &gt; <strong>120 s</strong>;</li>
+<li>compute <code>dt_s / step_m / speed_mps / bearing_deg</code> per point;</li>
+<li>flag GPS jumps (<code>speed &gt; 60 m/s</code>) and noisy altitude — flagged, not dropped.</li>
+</ol>
+<h3 id="removal-audit-real-whole-summary-scope-24876978-rows">Removal audit (real, whole summary scope = 24,876,978 rows)</h3>
+<table>
+<thead>
+<tr>
+<th>Removed</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Duplicate <code>(trajectory, timestamp)</code> rows</td>
+<td><strong>698,900</strong></td>
+</tr>
+<tr>
+<td>Invalid-coordinate rows (incl. null-island)</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>Unparsable-timestamp rows</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>Malformed rows dropped at parse</td>
+<td><strong>0</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Outputs (<code>ml/outputs/clean/</code>): <code>trajectory_summary.csv</code> (<strong>18,670 rows</strong>),
+<code>points_clean_sample.csv</code> (<strong>1,429,740 points</strong> from 1,200 fixed-seed
+trajectories), <code>preprocess_meta.json</code>, <code>sample_manifest.json</code>. Full run wall
+time: <strong>539.2 s</strong>.</p>
+<hr />
+<h2 id="4-exploratory-data-analysis-12-required-items">4. Exploratory data analysis (12 required items)</h2>
+<p>Figures: <code>ml/outputs/eda/fig_01..fig_12*.png</code>. Tables:
+<code>ml/outputs/eda/table_01..table_10*.csv</code>. All numbers are real GeoLife values;
+the point-level analyses use the fixed-seed 1,200-trajectory sample
+(1,429,740 points), the length/duration analyses use all 18,670 trajectories.</p>
+<p><strong>1. Shape / columns / dtypes.</strong> Cleaned point sample = <strong>1,429,740 rows × 15
+columns</strong> (<code>table_01_schema.csv</code>); trajectory summary = <strong>18,670 rows × 22
+columns</strong>.</p>
+<p><strong>2. Missing values &amp; duplicates.</strong> Across 24,876,978 raw rows: <strong>698,900</strong>
+duplicate-timestamp rows, <strong>1</strong> invalid coordinate, <strong>0</strong> unparsable timestamps,
+<strong>0</strong> malformed rows. In the cleaned sample, NaN occurs only in the derived
+<code>dt_s/step_m/speed_mps/bearing_deg</code> columns at segment starts (expected):
+<code>dt_s</code> missing = <strong>1,200</strong> rows (= one per trajectory).</p>
+<p><strong>3. Spatial extent.</strong> Latitude <strong>1.27681 .. 51.10710</strong>; longitude
+<strong>−179.69134 .. 179.99330</strong> (<code>fig_01_latlon_scatter.png</code>,
+<code>fig_02_latlon_density.png</code>). Density is overwhelmingly Beijing.</p>
+<p><strong>4. Trajectory length &amp; duration (all 18,670).</strong> Points/trajectory: median
+<strong>504</strong>, mean <strong>1295.0</strong>, max <strong>92,645</strong>. Duration: median <strong>2528 s</strong>, mean
+<strong>9675 s</strong>, max <strong>348,431 s</strong> (<code>fig_03</code>, <code>fig_04</code>). Summed trajectory distance
+<strong>1,021,454,302 m ≈ 1,021,454 km</strong>.</p>
+<p><strong>5. Sampling interval.</strong> median <code>dt</code> = <strong>2.00 s</strong>, mean <strong>4.74 s</strong>, p95
+<strong>5.00 s</strong>, max <strong>3595 s</strong>; <strong>96.3 %</strong> of intervals fall in the dense 1–5 s band
+(<code>fig_05</code>).</p>
+<p><strong>6. Speed (GPS jumps handled).</strong> <strong>4,525</strong> of 1,423,352 per-step speeds exceed
+the 60 m/s jump threshold and are <strong>excluded</strong> from the statistics. Speed excl.
+jumps: mean <strong>6.55 m/s</strong>, median <strong>3.23 m/s</strong>, p95 <strong>20.72 m/s</strong>, max
+<strong>59.99 m/s</strong> (<code>fig_06</code>).</p>
+<p><strong>7. Dwell time / stops.</strong> <strong>557</strong> stops detected (speed &lt; 0.5 m/s sustained
+≥ 120 s). Stop duration: median <strong>174 s</strong>, mean <strong>360 s</strong>, max <strong>9945 s</strong>
+(<code>fig_07</code>).</p>
+<p><strong>8. Time-of-day patterns.</strong> Busiest hour <strong>09:00</strong> with <strong>108,135</strong> fixes;
+quietest <strong>21:00</strong> with <strong>11,095</strong> (<code>fig_08</code>). Timestamps are local clock time;
+<strong>no timezone is stored</strong> in GeoLife.</p>
+<p><strong>9. Spatial trajectories plot.</strong> 60 sample trajectories drawn
+(<code>fig_09_spatial_trajectories.png</code>).</p>
+<p><strong>10. Outlier analysis.</strong> IQR-flag outliers per engineered feature (top 5):
+<code>alt_change</code> <strong>679,868 (47.55 %)</strong>, <code>straightness_w5</code> <strong>212,483 (14.86 %)</strong>,
+<code>accel_mps2</code> <strong>192,362 (13.45 %)</strong>, <code>turn_deg</code> <strong>175,317 (12.26 %)</strong>,
+<code>altitude</code> <strong>160,312 (11.21 %)</strong> (<code>table_08_outlier_summary.csv</code>,
+<code>fig_10_feature_boxplots.png</code>).</p>
+<p><strong>11. Correlation heatmap.</strong> Strongest feature correlation:
+<code>speed_mps ~ speed_mean_w5</code> with <strong>r = 0.979</strong> (expected — they measure the same
+motion at different windows) <code>table_09_correlation.csv</code>,
+<code>fig_11_correlation_heatmap.png</code>.</p>
+<p><strong>12. Class balance / labels.</strong> GeoLife <code>labels.txt</code> exists for <strong>69 users</strong>
+with <strong>14,718</strong> labelled segments, spanning transportation modes:
+<code>walk</code> 6,460 · <code>bus</code> 2,853 · <code>bike</code> 2,089 · <code>taxi</code> 1,179 · <code>car</code> 993 ·
+<code>subway</code> 813 · <code>train</code> 299 · <code>airplane</code> 17 · <code>boat</code> 7 · <code>run</code> 6 ·
+<code>motorcycle</code> 2 (<code>table_10_transport_labels.csv</code>,
+<code>fig_12_transport_mode_balance.png</code>).</p>
+<blockquote>
+<p><strong>There are NO danger / anomaly labels in GeoLife.</strong> The only labels are
+transportation modes, which do not mark anomalies. Class balance for a
+danger/anomaly detection task is therefore <strong>N/A</strong>. This is why the model is
+<strong>unsupervised</strong> and its output is a <em>movement anomaly score</em>, never a
+"danger probability".</p>
+</blockquote>
+<hr />
+<h2 id="5-reproducibility">5. Reproducibility</h2>
+<ul>
+<li>Fixed seed: <strong>42</strong> everywhere.</li>
+<li>Thresholds: jump speed <strong>60 m/s</strong>, segment gap <strong>120 s</strong>, stop speed
+  <strong>0.5 m/s</strong>, stop min duration <strong>120 s</strong>.</li>
+<li>Split is <strong>grouped by <code>traj_uid</code></strong> (whole trajectories, never random point
+  mixing).</li>
+<li>Full EDA wall time on this machine: <strong>56.5 s</strong>.</li>
+<li>One command: <code>powershell -NoProfile -ExecutionPolicy Bypass -File ml\run_all.ps1</code>
+  (see <code>ml/data/README.md</code> for the dataset download and the <code>-Fast</code> /
+  <code>-Synthetic</code> options).</li>
+</ul>
+<h3 id="the-synthetic-fallback">The SYNTHETIC fallback</h3>
+<p>If the 299 MB dataset is unavailable, the pipeline falls back to the tiny,
+clearly-labelled fixture in <code>ml/data/synthetic_sample/SYNTHETIC_*</code> (generated by
+<code>ml/data/make_synthetic_fixture.py</code>). It is <strong>not GeoLife</strong>: every stage prints a
+loud SYNTHETIC banner, figures carry a SYNTHETIC caption, and synthetic scored
+outputs are written under a <code>SYNTHETIC/</code> directory. <strong>Never report synthetic
+numbers as dataset results.</strong></p>
+<p><code>ml\run_all.ps1</code> now also runs <code>har_eda.py</code> and <code>history.py</code> by default; the two
+network steps are opt-in via <code>-Network</code> (<code>osm_eda.py</code>, <code>weather_eda.py</code>) and
+<code>-Transport</code> (<code>transport_mode.py</code>).</p>
+<hr />
+<h2 id="6-openstreetmap-eda-mlosm_edapy-real-live-data">6. OpenStreetMap EDA — <code>ml/osm_eda.py</code> (real, live data)</h2>
+<p>The brief's third dataset is OpenStreetMap. It is not a file to download: it is a
+live database, so the script fetches a bounded extract and analyses <strong>that</strong>, with
+the raw response cached under <code>ml/data/osm/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Value (measured)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Endpoint</td>
+<td><code>https://overpass-api.de/api/interpreter</code> (POST, 120 s timeout)</td>
+</tr>
+<tr>
+<td>Fetch time (UTC)</td>
+<td><code>2026-10-17T13:39:46Z</code></td>
+</tr>
+<tr>
+<td>Bounding box (S,W,N,E)</td>
+<td><code>39.9019627, 116.3887168, 39.9154373, 116.4062832</code> (1.5 km × 1.5 km, Tiananmen, Beijing)</td>
+</tr>
+<tr>
+<td>Nodes / ways / relations</td>
+<td><strong>12,783 / 3,197 / 0</strong> (15,980 elements)</td>
+</tr>
+<tr>
+<td>Node density</td>
+<td><strong>5,681.4 nodes/km²</strong></td>
+</tr>
+<tr>
+<td>Top tag keys</td>
+<td><code>building</code> 1,205 · <code>highway</code> 1,075 · <code>height</code> 800 · <code>building:part</code> 583</td>
+</tr>
+<tr>
+<td><code>highway=*</code> classes</td>
+<td>footway 504 · pedestrian 114 · steps 104 · service 83 (17 distinct)</td>
+</tr>
+<tr>
+<td><code>amenity=*</code> classes</td>
+<td>restaurant 36 · toilets 22 · cafe 12 (22 distinct)</td>
+</tr>
+<tr>
+<td>Attribution</td>
+<td>© OpenStreetMap contributors, ODbL</td>
+</tr>
+</tbody>
+</table>
+<p>Outputs: <code>ml/outputs/osm/</code> — six figures, seven tables (including the element
+centroids used for the scatter map) and <code>findings.md</code> recording the exact query,
+endpoint and fetch time. The exact query is reproducible:</p>
+<pre><code>[out:json][timeout:120];
+(
+  node(39.9019627,116.3887168,39.9154373,116.4062832);
+  way(39.9019627,116.3887168,39.9154373,116.4062832);
+);
+out center;
+</code></pre>
+<p>Re-run with <code>python ml/osm_eda.py</code> (uses the cache) or <code>--refresh</code>. If every
+Overpass mirror fails the script writes <code>NOT_RUN.md</code> with the exact error and
+exits non-zero — it never fabricates an extract.</p>
+<h2 id="7-weather-eda-mlweather_edapy-provider-is-stated-never-implied">7. Weather EDA — <code>ml/weather_eda.py</code> (provider is stated, never implied)</h2>
+<p><code>DATASETS.pdf</code> names the <strong>OpenWeatherMap</strong> API, which needs an API key that was
+not supplied. The script therefore supports both providers and <em>says which one it
+used on every artefact</em>:</p>
+<ul>
+<li>if <code>OPENWEATHER_API_KEY</code> is set → <strong>OpenWeatherMap</strong>;</li>
+<li>otherwise → the key-free <strong>Open-Meteo</strong> historical archive.</li>
+</ul>
+<p>Every artefact in this repository was produced by <strong>Open-Meteo</strong>, and is labelled
+as such. It is never presented as OpenWeatherMap data.</p>
+<table>
+<thead>
+<tr>
+<th>Site</th>
+<th>Latitude</th>
+<th>Longitude</th>
+<th style="text-align: right;">Days</th>
+<th style="text-align: right;">mean T (°C)</th>
+<th style="text-align: right;">min T</th>
+<th style="text-align: right;">max T</th>
+<th style="text-align: right;">precipitation (mm)</th>
+<th style="text-align: right;">mean RH (%)</th>
+<th style="text-align: right;">harsh days</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geolife_centroid</code></td>
+<td>39.97698</td>
+<td>116.35008</td>
+<td style="text-align: right;">574</td>
+<td style="text-align: right;">12.17</td>
+<td style="text-align: right;">−14.6</td>
+<td style="text-align: right;">40.0</td>
+<td style="text-align: right;">806.4</td>
+<td style="text-align: right;">48.9</td>
+<td style="text-align: right;">175 (30.5 %)</td>
+</tr>
+<tr>
+<td><code>huangshan_trek</code></td>
+<td>30.13400</td>
+<td>118.16100</td>
+<td style="text-align: right;">574</td>
+<td style="text-align: right;">7.07</td>
+<td style="text-align: right;">−15.9</td>
+<td style="text-align: right;">25.5</td>
+<td style="text-align: right;">2,676.3</td>
+<td style="text-align: right;">73.5</td>
+<td style="text-align: right;">218 (38.0 %)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Date range: <strong>2011-01-01 … 2012-07-27</strong> (the two sites share it).</li>
+<li>Site A is the <strong>component-wise median</strong> of the 1,429,740-point cleaned GeoLife
+  sample (the arithmetic mean is dragged west by long-haul traces); Site B is the
+  Huangshan (Yellow Mountain) scenic area, an analyst-chosen trekking deployment
+  point — stated as such, <strong>not</strong> derived from GeoLife.</li>
+<li>Harsh-day rule (explicit): precipitation ≥ 10 mm <strong>or</strong> min T ≤ −5 °C <strong>or</strong>
+  max T ≥ 35 °C <strong>or</strong> mean wind ≥ 30 km/h.</li>
+</ul>
+<p>Outputs: <code>ml/outputs/weather/</code> — four figures (daily temperature range, monthly
+precipitation, humidity/wind distributions, harsh days per month), four tables and
+<code>findings.md</code> with the exact request URLs. Re-run with <code>python ml/weather_eda.py</code>.</p>
+<h2 id="8-uci-har-eda-mlhar_edapy">8. UCI HAR EDA — <code>ml/har_eda.py</code></h2>
+<p>The HAR training tables already existed; this adds the missing <strong>figure set</strong> under
+<code>ml/outputs/har/eda/</code>: class balance (train/test), a subject-split table, per-axis
+accelerometer/gyroscope signal bands, gravity-magnitude histograms and a
+feature-correlation heatmap. Measured inputs: <strong>561 features</strong>, <strong>7,352</strong> training
+windows, <strong>2,947</strong> test windows, <strong>6</strong> activities, and a <strong>subject-disjoint</strong>
+split (<strong>21 / 9</strong> subjects, overlap <strong>0</strong>). Overall gravity magnitude <strong>1.0323 g</strong>
+(1.0075–1.0516 g per activity).</p>
+<h2 id="9-historical-trajectory-analysis-and-zone-crossing-trends-mlhistorypy">9. Historical trajectory analysis and zone-crossing trends — <code>ml/history.py</code></h2>
+<p>Real GeoLife data, no labels required.</p>
+<ul>
+<li>Scope: <strong>18,670 trajectories / 182 users</strong>, spanning <strong>2000-01-01 … 2012-07-27</strong>;
+  point-level analyses use the cleaned sample (<strong>1,429,740 points / 1,200
+  trajectories</strong>, seed 42).</li>
+<li>Distance: <strong>1,021,454 km</strong> total across all users (median 516.9 km/user).</li>
+<li>Temporal: busiest hour <strong>09:00</strong> (108,135 fixes), quietest <strong>21:00</strong> (11,095);
+  busiest weekday <strong>Sat</strong>; peak month <strong>2008-11</strong> (1,168 trajectories).</li>
+<li>Revisit/stay: <strong>557 stops</strong>; overall <strong>revisit rate 0.487</strong>; the single
+  most-revisited place has <strong>19</strong> stops.</li>
+<li><strong>Zone-crossing trend.</strong> The zone is derived, not hand-drawn: take the cleaned
+  points inside lat [39.5, 40.5], lon [115.5, 117.0], find the densest 0.02° cell
+  (<strong>39.9900 N, 116.3300 E</strong>, 99,903 points) and expand it by ±0.03°. Resulting
+  zone: <strong>S 39.95, W 116.29, N 40.03, E 116.37</strong>. Of the <strong>785</strong> trajectories that
+  intersect it, <strong>431</strong> cross it at least once — <strong>430 entries / 426 exits</strong> over
+  58 months, plotted as a monthly trend.</li>
+</ul>
+<p>Outputs: <code>ml/outputs/history/</code> (figures, tables, <code>findings.md</code>).</p>
+<h2 id="10-transport-mode-model-and-the-honest-answer-on-future-risk">10. Transport-mode model, and the honest answer on "future risk"</h2>
+<p><code>ml/transport_mode.py</code> trains a supervised model on the <strong>only valid supervised
+target in the dataset</strong> — GeoLife <code>labels.txt</code> transportation mode — and labels
+itself clearly as <em>next-segment transport-mode prediction, <strong>not</strong> a risk model</em>.</p>
+<ul>
+<li><strong>9,584</strong> labelled segments from <strong>69</strong> users; <strong>subject-disjoint</strong> split
+  (<strong>45 train / 19 test</strong> users; 8,036 / 1,548 segments).</li>
+<li>Random forest, unseen users: <strong>accuracy 0.8475</strong>, <strong>macro-F1 0.5784</strong>,
+  weighted-F1 0.8507. Top features: <code>p95_speed_mps</code>, <code>distance_m</code>,
+  <code>mean_speed_mps</code>.</li>
+</ul>
+<p><strong>Future-risk prediction: not built, on purpose.</strong> None of the four datasets
+contains an injury, danger or incident outcome label. GeoLife's labels are
+transport modes; UCI HAR's are six scripted activities; OSM has no outcomes; the
+weather series has no tourist incidents. With no outcome to predict, a
+"future-risk" model would be an invention, so none is shipped. The app's
+<code>ApproachRisk</code> score is a <strong>documented weighted heuristic</strong> over proxemics
+(zone severity, distance, dwell, night) — not a learned model — and it is
+described as such in <code>docs/model_card_movement.md</code> and <code>README.md</code> §9.3.</p>
+<p>Outputs: <code>ml/outputs/transport/</code> (figures, tables, <code>findings.md</code>, <code>model_card.md</code>).</p></body></html>

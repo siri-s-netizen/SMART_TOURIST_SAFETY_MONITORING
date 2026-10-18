@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A deliberately minimal platform theme. All real theming is done by Material 3 in Compose
+      (see ui/theme/Theme.kt), so this only needs to remove the action bar and set window colours.
+    -->
+    <style name="Theme.TouristSafety" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

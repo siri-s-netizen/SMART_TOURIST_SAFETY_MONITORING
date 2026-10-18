@@ -1,0 +1,1059 @@
+<!doctype html><html><head><meta charset='utf-8'><title>future_risk_prediction</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="future-risk-prediction-model-card-and-dataset-provenance">Future risk prediction - model card and dataset provenance</h1>
+<p><strong>Artefact:</strong> <code>app/src/main/assets/future_risk_model.json</code> (also <code>ml/outputs/future_risk/future_risk_model.json</code>)
+<strong>Model version string:</strong> <code>future-risk-unimib-v1</code>
+<strong>Pipeline:</strong> <code>ml/future_risk/</code> (<code>config.py</code>, <code>features.py</code>, <code>dataset.py</code>, <code>train.py</code>, <code>tune.py</code>)
+<strong>This card describes:</strong> a <em>trained, supervised, future-event</em> model. It is not the geofence rule, and it is not the approach-risk checklist.</p>
+<p>Every number below was written by <code>ml/future_risk/train.py</code> into <code>ml/outputs/future_risk/metrics.json</code>, <code>dataset_provenance.json</code> and <code>tuning.json</code>, and is re-checked by <code>ml/future_risk/tests/test_future_risk.py</code>. Nothing here is estimated, rounded up, or carried over from an earlier run.</p>
+<hr />
+<h2 id="1-what-the-model-answers">1. What the model answers</h2>
+<blockquote>
+<p>Given the <strong>last second</strong> of phone accelerometer data, will a <strong>hard fall impact</strong> happen within the <strong>next second</strong>?</p>
+</blockquote>
+<p>Both halves of that sentence are load-bearing:</p>
+<ul>
+<li><strong>"hard fall impact"</strong> is a real, physical, recorded event in a public dataset - not a proxy, not a score, not a label invented by this project.</li>
+<li><strong>"within the next second"</strong> is a horizon the data can actually support (section 4). It is <strong>not</strong> a 30-minute forecast, and a 30-minute forecast is not attempted, because accelerometer data cannot see 30 minutes into the future.</li>
+</ul>
+<h3 id="in-scope">In scope</h3>
+<ul>
+<li>An informational signal to the tourist ("the model thinks something hard may land in the next second") and a throttled summary to the authority dashboard.</li>
+<li>A pre-impact <strong>fall</strong> forecast, for phones carried on the body, held in the hand, or in a pocket - the placements UniMiB SHAR actually recorded.</li>
+</ul>
+<h3 id="out-of-scope-explicitly">Out of scope - explicitly</h3>
+<table>
+<thead>
+<tr>
+<th>Not claimed</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Any horizon longer than 1 s</td>
+<td>Not learnable from accelerometer data (section 4).</td>
+</tr>
+<tr>
+<td>Tourist incidents, injuries, crime, medical events, or "danger zones"</td>
+<td>The training labels are <strong>falls in a laboratory</strong>, not tourist incidents.</td>
+</tr>
+<tr>
+<td>A standalone fall alarm</td>
+<td>Measured false-alarm rates are far too high to alarm on (sections 9 and 10).</td>
+</tr>
+<tr>
+<td>Causation of any kind</td>
+<td>The reported contributing factors are "readings this model leans on", nothing more.</td>
+</tr>
+<tr>
+<td>Any use as a safety-critical system</td>
+<td>This has never been validated on a real deployment, on real tourists, or on a phone in a moving vehicle.</td>
+</tr>
+<tr>
+<td>Automatic SOS</td>
+<td>Risk <strong>never</strong> triggers an SOS. SOS remains a deliberate tourist action. See section 12.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-dataset-and-provenance">2. Dataset and provenance</h2>
+<p><strong>UniMiB SHAR</strong> - Micucci, D., Mobilio, M., Napoletano, P. (2017). <em>UniMiB SHAR: A Dataset for Human Activity Recognition Using Acceleration Data from Smartphones.</em> arXiv:1611.07688v2. University of Milano-Bicocca.</p>
+<table>
+<thead>
+<tr>
+<th>Fact</th>
+<th>Measured value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Archive</td>
+<td><code>ml/data/unimib/UniMiB-SHAR.zip</code></td>
+</tr>
+<tr>
+<td>Archive size</td>
+<td>266,206,080 bytes</td>
+</tr>
+<tr>
+<td>Archive SHA-256</td>
+<td><code>365a396729c0755b4ba8ef8ee0ba52a0621aa535282470546d8a663ff2567160</code></td>
+</tr>
+<tr>
+<td>Source file used</td>
+<td><code>data/full_data.mat</code> (29,084,022 bytes), SHA-256 recorded in <code>dataset_provenance.json</code></td>
+</tr>
+<tr>
+<td>Subjects</td>
+<td>30 (gender, age, height, weight recorded for all 30)</td>
+</tr>
+<tr>
+<td>Activities</td>
+<td>9 of daily living + 8 fall types</td>
+</tr>
+<tr>
+<td>Sampling rate</td>
+<td>50 Hz</td>
+</tr>
+<tr>
+<td>Trials read</td>
+<td>1,980</td>
+</tr>
+<tr>
+<td>Trials used</td>
+<td><strong>1,979</strong> (1 dropped - see below)</td>
+</tr>
+<tr>
+<td>Units</td>
+<td>g (total acceleration, gravity included)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="why-full_datamat-and-not-the-shipped-windows">Why <code>full_data.mat</code> and not the shipped windows</h3>
+<p>UniMiB also ships pre-cut 151-sample windows. They are <strong>centred on the peak of the impact</strong>, so using them would destroy the pre-impact timeline this model's label is built from - there would be no "before the impact" left to predict from. The pipeline therefore reads <code>full_data.mat</code>, the full recordings, and cuts its own windows.</p>
+<h3 id="licence-position-stated-as-it-is">Licence position, stated as it is</h3>
+<p>UniMiB SHAR is publicly distributed by its authors for academic research use. <strong>The download carries no explicit OSI-approved licence.</strong> No licence is asserted in the provenance file; downstream reuse should cite the paper and treat the terms as research-use-only. Only derived artefacts are redistributed here - model weights, aggregate metrics and 16 reference windows - never the raw recordings.</p>
+<h3 id="the-defect-that-was-found-and-what-was-done-about-it">The defect that was found, and what was done about it</h3>
+<p>One recording is corrupt: <strong>subject 10, <code>Jumping</code>, trial 1</strong> contains <strong>9,369 non-finite values out of 9,624</strong> (3,208 samples). It was <strong>dropped, counted and reported</strong> (<code>data_quality.dropped</code> in <code>dataset_provenance.json</code>) - not interpolated, not filled with the mean, and not silently skipped. A NaN in a feature vector would have propagated into every tree that touched it. This is why the kept-trial count is 1,979 rather than 1,980, and why <code>Jumping</code> shows 59 trials in the per-activity table instead of 60.</p>
+<h3 id="data-quality-note-on-the-subject-table">Data-quality note on the subject table</h3>
+<p>Two subjects' height/weight fields in the MATLAB struct are unpopulated; the pipeline treats "unreadable" and "zero" differently and never substitutes a population mean for a missing body measurement. <code>dataset_provenance.json</code> records the subject table verbatim for audit.</p>
+<hr />
+<h2 id="3-target-and-label-definition">3. Target and label definition</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Positive class</td>
+<td><code>IMMINENT_FALL</code></td>
+</tr>
+<tr>
+<td>Negative class</td>
+<td><code>NO_IMMINENT_FALL</code></td>
+</tr>
+<tr>
+<td>Horizon</td>
+<td><strong>50 samples = 1.0 s</strong></td>
+</tr>
+<tr>
+<td>Feature window</td>
+<td><strong>50 samples = 1.0 s</strong></td>
+</tr>
+<tr>
+<td>Window stride</td>
+<td>10 samples (0.2 s)</td>
+</tr>
+<tr>
+<td>Impact threshold</td>
+<td>peak magnitude &gt;= <strong>2.0 g</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-the-impact-instant-is-found">How the impact instant is found</h3>
+<p>For each fall trial, <code>t_impact = argmax(magnitude over the trial)</code>, accepted only if <code>magnitude[t_impact] &gt;= 2.0 g</code>.</p>
+<ul>
+<li>The <code>argmax</code> is a <strong>post-hoc</strong> quantity: the impact <em>time</em> is only knowable after the recording. That is what supervised labelling means, and the provenance file says so in as many words.</li>
+<li>2.0 g reuses the app's own <code>FallPolicy.MIN_IMPACT_G</code>, so the model and the heuristic agree on what a hard landing is.</li>
+<li><strong>6 fall trials</strong> had no sample reaching 2.0 g. They are excluded from the positives, counted in <code>window_stats.n_fall_trials_without_impact</code>, and reported.</li>
+<li>Over the 1,440 fall trials used, the impact peak ranged from <strong>2.0299 g</strong> to <strong>3.4562 g</strong>.</li>
+</ul>
+<h3 id="the-labelling-rule">The labelling rule</h3>
+<ul>
+<li><strong>Positive:</strong> a window ending at sample <code>t</code> in <code>[t_impact - 50, t_impact - 1]</code>, i.e. a lead time of 1..50 samples.</li>
+<li><strong>Negative:</strong> a window cut at the same 0.2 s cadence from an <strong>activity-of-daily-living</strong> trial.</li>
+</ul>
+<p>The negative definition is deliberately the narrow one. A post-impact window is <em>not</em> a training negative - "the fall has already landed" is a different question, and mixing it in would blur what the negative class means. Post-impact windows are instead kept aside as a <strong>diagnostic</strong> (section 9).</p>
+<h3 id="why-the-two-classes-have-an-honest-meaning">Why the two classes have an honest meaning</h3>
+<p>A positive really is "a recorded human fall is one second away". A negative really is "a recorded human is walking, running, sitting, standing, lying down, or climbing stairs". Neither class depends on anything from after its own prediction instant except the impact <em>time</em> used to build the label.</p>
+<h3 id="leakage-checked-rather-than-asserted">Leakage, checked rather than asserted</h3>
+<p><code>train.check_no_future_information()</code> runs on every training pass and its result is stored in <code>metrics.json</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Window length</td>
+<td>50 samples</td>
+</tr>
+<tr>
+<td>Horizon</td>
+<td>50 samples</td>
+</tr>
+<tr>
+<td>All positive windows end <strong>before</strong> their own impact</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td>All leads within the horizon (1..50)</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td>Feature window never overlaps the label window</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td>Minimum / maximum lead observed</td>
+<td>10 / 50 samples</td>
+</tr>
+<tr>
+<td>Max end index over all positives</td>
+<td>266</td>
+</tr>
+</tbody>
+</table>
+<p>A window ending at <code>t</code> uses samples <code>[t-49, t]</code>; the label asks about <code>(t, t+50]</code>. The two intervals are disjoint by construction, and the test re-derives that from the raw recordings rather than trusting the summary.</p>
+<p>The second leakage control is the <strong>shuffled-label run</strong>: the same features, the same pipeline and the same forest, with the labels randomly permuted. It scores <strong>ROC-AUC 0.47743 / PR-AUC 0.129885</strong> - chance. If the construction leaked, this number would exceed 0.5. It does not.</p>
+<hr />
+<h2 id="4-why-the-horizon-is-one-second">4. Why the horizon is one second</h2>
+<p>The horizon was <strong>measured, not chosen for convenience</strong>:</p>
+<ul>
+<li>Fall trials run 151-446 samples (median <strong>174 samples = 3.5 s</strong>).</li>
+<li>The impact sits around index ~120 in a median trial, leaving <strong>&gt;= 95 samples</strong> of pre-impact signal.</li>
+<li>A 50-sample (1.0 s) window that must end at least 1 sample before the impact therefore fits in every included trial. Longer windows would not, which is why 1.0 s is the <em>longest fully supported</em> horizon and not merely a round number.</li>
+</ul>
+<p>Lead-time distribution over the positives (windows per lead, 10-sample stride):</p>
+<table>
+<thead>
+<tr>
+<th>Lead (samples)</th>
+<th>50</th>
+<th>40</th>
+<th>30</th>
+<th>20</th>
+<th>10</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows</td>
+<td>923</td>
+<td>1,268</td>
+<td>1,412</td>
+<td>1,425</td>
+<td>1,430</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Explicitly not attempted:</strong> a 30-minute danger forecast. The four datasets named in <code>DATASETS.pdf</code> (GeoLife, UCI HAR, OpenStreetMap, OpenWeatherMap/Open-Meteo) contain <strong>no incident or injury outcome at all</strong>, so a supervised tourist-incident model cannot be trained from them. The honest options were to pick a dataset with real outcome labels, or to fabricate one. This pipeline picked the former and says so.</p>
+<hr />
+<h2 id="5-features-22-in-fixed-order">5. Features (22, in fixed order)</h2>
+<p>Extracted from <strong>the accelerometer only</strong>, in <strong>g</strong>, from the phone's own sensor. The order is the forest contract: every tree node stores a feature <em>index</em>, so reordering this list silently changes every prediction. <code>FutureRiskFeatures.NAMES</code> in Kotlin asserts the same list, and <code>FutureRiskReferenceTest</code> fails if they diverge.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Feature</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>acc_mag_mean</code></td>
+<td>Average force on the phone</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>acc_mag_std</code></td>
+<td>How much the force is fluctuating</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>acc_mag_min</code></td>
+<td>Lightest moment</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>acc_mag_max</code></td>
+<td>Hardest moment</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>acc_mag_range</code></td>
+<td>Spread between lightest and hardest</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>acc_mag_energy</code></td>
+<td>Mean squared magnitude</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>acc_mag_peak_jerk</code></td>
+<td>Largest single-sample change in force</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>acc_mag_zcr</code></td>
+<td>How often the force crosses its own mean</td>
+</tr>
+<tr>
+<td>8-10</td>
+<td><code>acc_x_mean</code>, <code>acc_y_mean</code>, <code>acc_z_mean</code></td>
+<td>Mean direction of the force</td>
+</tr>
+<tr>
+<td>11-13</td>
+<td><code>acc_x_std</code>, <code>acc_y_std</code>, <code>acc_z_std</code></td>
+<td>Per-axis motion</td>
+</tr>
+<tr>
+<td>14-16</td>
+<td><code>acc_xy_corr</code>, <code>acc_xz_corr</code>, <code>acc_yz_corr</code></td>
+<td>How the axes move together</td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>freefall_fraction</code></td>
+<td>Share of the second below 0.5 g</td>
+</tr>
+<tr>
+<td>18</td>
+<td><code>tilt_deg</code></td>
+<td>Angle of the phone from vertical</td>
+</tr>
+<tr>
+<td>19</td>
+<td><code>orientation_change_deg</code></td>
+<td>Rotation between the two halves of the second</td>
+</tr>
+<tr>
+<td>20</td>
+<td><code>acc_mag_slope</code></td>
+<td>Direction of the trend in force</td>
+</tr>
+<tr>
+<td>21</td>
+<td><code>acc_mag_late_to_early_ratio</code></td>
+<td>Late force over early force</td>
+</tr>
+</tbody>
+</table>
+<p>Implementation details that matter for parity:</p>
+<ul>
+<li>Population standard deviation (<code>ddof = 0</code>).</li>
+<li><code>np.signbit</code> semantics for the zero-crossing count (negative zero counts as negative).</li>
+<li><code>freefall_fraction</code> uses the fixed threshold 0.5 g.</li>
+<li>Orientation features return <strong>0</strong> when the mean acceleration vector's norm is below 0.1 g, because the direction is undefined there - a division by ~zero would otherwise produce an arbitrary angle.</li>
+<li>The late/early ratio floors its denominator at 1e-3.</li>
+</ul>
+<h3 id="missing-and-bad-inputs">Missing and bad inputs</h3>
+<p>The model is only ever given a full 50-sample window. If fewer samples exist, the app reports <strong>"Insufficient data"</strong> and no band; it does not pad, interpolate or carry the last window forward as if it were fresh. If any sample is non-finite, or any magnitude exceeds <strong>16 g</strong> (which is what a driver reporting m/s² instead of g looks like), the app reports the reading as unusable and predicts nothing. The contract lives in the artefact as <code>insufficient_data</code> so the app and the pipeline cannot disagree about it.</p>
+<h3 id="contributing-factors-and-the-caveat-that-travels-with-them">Contributing factors, and the caveat that travels with them</h3>
+<p>The artefact ships the forest's global Gini importance, the training mean and standard deviation per feature, and a human-readable label per feature. The app ranks features by <code>importance x |z-score|</code>, keeps those with <code>|z| &gt;= 0.75</code>, and shows at most 3.</p>
+<blockquote>
+<p><strong>These are the readings this model leans on that are currently unusual. They are not causes, and the model makes no claim that they are.</strong></p>
+</blockquote>
+<p>That sentence is part of the app's card text and is asserted by a test, because a factor list is exactly the sort of thing a reader turns into a causal story.</p>
+<hr />
+<h2 id="6-training-methodology">6. Training methodology</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Split</td>
+<td><strong>subject-disjoint</strong>, 60/20/20</td>
+</tr>
+<tr>
+<td>Seed</td>
+<td>42</td>
+</tr>
+<tr>
+<td>Subjects</td>
+<td>30 -&gt; train 18 / validation 6 / test 6</td>
+</tr>
+<tr>
+<td>Subjects disjoint</td>
+<td><strong>true</strong> (checked in <code>metrics.json</code>)</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>51,128 total: train 31,122 / val 9,591 / test 10,415</td>
+</tr>
+<tr>
+<td>Positives</td>
+<td>6,458 (12.63% of all windows)</td>
+</tr>
+<tr>
+<td>Negatives</td>
+<td>44,670</td>
+</tr>
+<tr>
+<td>Imbalance handling</td>
+<td><code>class_weight="balanced_subsample"</code></td>
+</tr>
+<tr>
+<td>Preprocessing</td>
+<td>none that needs fitting: every feature is scale-free per window (means, stds, correlations, angles, fractions, a ratio) - there is no scaler fitted on the training split, therefore nothing that could leak a global mean into the test set</td>
+</tr>
+<tr>
+<td>Test set</td>
+<td>touched <strong>once</strong>, after every choice was frozen</td>
+</tr>
+</tbody>
+</table>
+<p>Subject-disjoint splitting is the only defensible choice for body-worn sensor data: the same person in both training and test would let the model memorise an individual's gait. Validation subjects <code>[12, 13, 15, 18, 24, 29]</code> were used for calibration, band thresholds and hyper-parameter selection; test subjects <code>[2, 3, 5, 9, 14, 28]</code> were not inspected until the final scoring pass.</p>
+<p><strong>Validation's only jobs:</strong> fitting the Platt calibration, choosing the two band thresholds, and choosing the hyper-parameters. Nothing was tuned on the test set.</p>
+<hr />
+<h2 id="7-model-selection-under-a-size-budget">7. Model selection under a size budget</h2>
+<p><code>ml/future_risk/tune.py</code> searched <strong>65 configurations</strong> on the validation split only.</p>
+<p>The winner by validation PR-AUC was rejected, and this is the honest reason:</p>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Val PR-AUC</th>
+<th>Val ROC-AUC</th>
+<th>Exported asset</th>
+<th>Nodes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>300 trees, unlimited depth, leaf 1, <code>sqrt</code>, balanced</td>
+<td><strong>0.8759</strong></td>
+<td>0.9764</td>
+<td><strong>20,059.7 KB</strong></td>
+<td>700,492</td>
+</tr>
+<tr>
+<td>300 trees, depth 8, leaf 8, <code>max_features=0.3</code></td>
+<td>0.8201</td>
+<td>0.9625</td>
+<td>2,003,677 <strong>bytes</strong> (over budget by 3,677)</td>
+<td>66,962</td>
+</tr>
+<tr>
+<td><strong>120 trees, depth 11, leaf 4, <code>sqrt</code>, balanced (shipped)</strong></td>
+<td><strong>0.8451</strong></td>
+<td><strong>0.9709</strong></td>
+<td><strong>1,968,314 bytes</strong></td>
+<td><strong>66,894</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The <strong>2,000,000-byte budget is a deployment constraint</strong>: the forest is exported to JSON and walked on a phone from an app asset. It is not a quality metric, and the selection rule is recorded in <code>tuning.json</code> (<code>selection_rule</code>) and re-derived by a test rather than being a note in a document.</p>
+<p>Two things worth reading off that table:</p>
+<ul>
+<li>Only <strong>1 of 65</strong> configurations fits the budget at all. The constraint is genuinely binding, not decorative.</li>
+<li>The shipped configuration is <strong>both better and smaller</strong> than the smallest 300-tree export (0.8451 vs 0.8201, 1,968,314 vs 2,003,677 bytes), so the tree budget is better spent on depth than on tree count here.</li>
+</ul>
+<p>Cost of the constraint, stated plainly: <strong>-0.031 validation PR-AUC</strong> (0.8759 -&gt; 0.8451), and it is the reason the shipped model is not the best model this pipeline can fit.</p>
+<p>Shipped hyper-parameters live in <code>ml/future_risk/config.py</code> (<code>N_ESTIMATORS</code>, <code>MAX_DEPTH</code>, <code>MIN_SAMPLES_LEAF</code>, <code>MAX_FEATURES</code>, <code>CLASS_WEIGHT</code>) and are asserted against <code>tuning.json.selected</code> by the test suite, so a config edit that is not reflected in the search record fails a test.</p>
+<hr />
+<h2 id="8-calibration">8. Calibration</h2>
+<p>A forest's vote fraction is not a probability. The shipped model applies <strong>Platt scaling</strong> (logistic regression on <code>logit(p_forest)</code>), fitted <strong>on the validation split only</strong>:</p>
+<pre><code>calibrated = 1 / (1 + exp(-(a * ln(p/(1-p)) + b)))
+a = 1.24940294   b = -1.07904853
+logit clipped at 1e-6 (matches LOGIT_CLIP in FutureRiskModel.kt)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Metric (held-out test)</th>
+<th>Raw forest</th>
+<th>Calibrated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Brier score</td>
+<td>0.062600</td>
+<td><strong>0.056675</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Reliability on the held-out test set (10 bins, <code>calibration_reliability.csv</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Bin</th>
+<th>n</th>
+<th>Mean predicted</th>
+<th>Observed frequency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.0-0.1</td>
+<td>8,376</td>
+<td>0.0122</td>
+<td>0.0224</td>
+</tr>
+<tr>
+<td>0.1-0.2</td>
+<td>326</td>
+<td>0.1450</td>
+<td>0.1902</td>
+</tr>
+<tr>
+<td>0.2-0.3</td>
+<td>193</td>
+<td>0.2482</td>
+<td>0.3886</td>
+</tr>
+<tr>
+<td>0.3-0.4</td>
+<td>140</td>
+<td>0.3461</td>
+<td>0.5000</td>
+</tr>
+<tr>
+<td>0.4-0.5</td>
+<td>123</td>
+<td>0.4482</td>
+<td>0.4553</td>
+</tr>
+<tr>
+<td>0.5-0.6</td>
+<td>135</td>
+<td>0.5517</td>
+<td>0.4296</td>
+</tr>
+<tr>
+<td>0.6-0.7</td>
+<td>138</td>
+<td>0.6520</td>
+<td>0.5217</td>
+</tr>
+<tr>
+<td>0.7-0.8</td>
+<td>189</td>
+<td>0.7504</td>
+<td>0.5608</td>
+</tr>
+<tr>
+<td>0.8-0.9</td>
+<td>299</td>
+<td>0.8589</td>
+<td>0.6957</td>
+</tr>
+<tr>
+<td>0.9-1.0</td>
+<td>496</td>
+<td>0.9407</td>
+<td>0.8952</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Read this table honestly.</strong> Calibration improves the Brier score and the top bin is close, but the middle bins (0.2-0.4) are badly over-confident: 140 windows predicted at ~0.35 were positive 50% of the time. The probability is therefore shown in the app <strong>only because it is calibrated</strong>, and it is shown alongside the band, the thresholds and the model version - never as a bare percentage.</p>
+<hr />
+<h2 id="9-measured-performance-held-out-test-set">9. Measured performance (held-out test set)</h2>
+<p>Test set: 10,415 windows from 6 subjects never seen in training, 1,339 positive.</p>
+<h3 id="baselines-and-the-shipped-model">Baselines and the shipped model</h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Precision</th>
+<th>Recall</th>
+<th>F1</th>
+<th>ROC-AUC</th>
+<th>PR-AUC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Majority class</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.5000</td>
+<td>0.128565</td>
+</tr>
+<tr>
+<td>Logistic regression</td>
+<td>0.4760</td>
+<td>0.8432</td>
+<td>0.6085</td>
+<td>0.904389</td>
+<td>0.659633</td>
+</tr>
+<tr>
+<td><strong>Hist gradient boosting</strong></td>
+<td><strong>0.7916</strong></td>
+<td>0.6721</td>
+<td><strong>0.7270</strong></td>
+<td><strong>0.945913</strong></td>
+<td><strong>0.815000</strong></td>
+</tr>
+<tr>
+<td>Random forest, raw vote @ 0.5</td>
+<td>0.6534</td>
+<td>0.7827</td>
+<td>0.7122</td>
+<td>0.936848</td>
+<td>0.764569</td>
+</tr>
+<tr>
+<td><strong>Random forest, calibrated, HIGH band &gt;= 0.314046 (shipped)</strong></td>
+<td><strong>0.6707</strong></td>
+<td><strong>0.7498</strong></td>
+<td><strong>0.7080</strong></td>
+<td><strong>0.936848</strong></td>
+<td><strong>0.764569</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The majority-class row is not padding: with a 12.86% positive rate, a model that always says "no" scores 87.1% accuracy, and PR-AUC 0.128565 <em>is</em> that positive rate. Accuracy alone would be a lie here, which is why every table in this card reports precision, recall, PR-AUC and ROC-AUC.</p>
+<h3 id="the-shipped-model-is-not-the-best-model-available-and-that-is-recorded-on-purpose">The shipped model is not the best model available - and that is recorded on purpose</h3>
+<p><code>hist_gradient_boosting</code> scores <strong>PR-AUC 0.8150</strong> against the shipped forest's <strong>0.7646</strong>, and it also wins on precision, F1 and ROC-AUC. It is <strong>not shipped</strong>, because it cannot be walked on-device by <code>DecisionForest</code> and its serialisation does not fit the asset budget. Anyone comparing this model against the number 0.8150 should know that a better offline model exists in the same repository, and can be produced with one command.</p>
+<h3 id="confusion-matrix-shipped-model-at-the-high-threshold">Confusion matrix, shipped model at the HIGH threshold</h3>
+<p>Labels: <code>NO_IMMINENT_FALL</code>, <code>IMMINENT_FALL</code>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Predicted no</th>
+<th>Predicted yes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Actually no</strong></td>
+<td>8,583</td>
+<td>493</td>
+</tr>
+<tr>
+<td><strong>Actually yes</strong></td>
+<td>335</td>
+<td>1,004</td>
+</tr>
+</tbody>
+</table>
+<p>Accuracy 0.9205, Brier 0.056675, threshold 0.314046.</p>
+<h3 id="detection-over-the-horizon-the-lead-time-table">Detection over the horizon (the lead-time table)</h3>
+<table>
+<thead>
+<tr>
+<th>Lead</th>
+<th>Positive windows</th>
+<th>Detected</th>
+<th>Detection rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.2 s</td>
+<td>284</td>
+<td>204</td>
+<td>0.718310</td>
+</tr>
+<tr>
+<td>0.4 s</td>
+<td>281</td>
+<td>199</td>
+<td>0.708185</td>
+</tr>
+<tr>
+<td>0.6 s</td>
+<td>281</td>
+<td>217</td>
+<td>0.772242</td>
+</tr>
+<tr>
+<td>0.8 s</td>
+<td>270</td>
+<td>213</td>
+<td>0.788889</td>
+</tr>
+<tr>
+<td>1.0 s</td>
+<td>223</td>
+<td>171</td>
+<td>0.766816</td>
+</tr>
+</tbody>
+</table>
+<p>Detection does <strong>not</strong> collapse as the lead grows, which is the interesting result: there is real pre-impact signal, not just "the last moment before the peak".</p>
+<h3 id="trial-level-sensitivity-the-number-that-matters-most">Trial-level sensitivity - the number that matters most</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Held-out fall trials</td>
+<td><strong>284</strong></td>
+</tr>
+<tr>
+<td>Trials with at least one window flagged HIGH</td>
+<td><strong>264</strong></td>
+</tr>
+<tr>
+<td><strong>Trial sensitivity</strong></td>
+<td><strong>0.929577</strong></td>
+</tr>
+</tbody>
+</table>
+<p>This is reported separately from window recall (0.7498) because a single fall generates many overlapping windows, so window recall flatters any model that catches one of them. <strong>"93% of real falls were flagged at least once within the last second"</strong> is the honest headline; 0.7498 is the window-level number underneath it.</p>
+<h3 id="false-alarms-on-ordinary-activity">False alarms on ordinary activity</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ADL windows on the test subjects</td>
+<td>9,076</td>
+</tr>
+<tr>
+<td>ADL windows flagged HIGH</td>
+<td>493</td>
+</tr>
+<tr>
+<td>ADL window false-positive rate</td>
+<td>0.054319</td>
+</tr>
+<tr>
+<td><strong>False alarms per minute of ordinary activity (0.2 s stride)</strong></td>
+<td><strong>16.295725</strong></td>
+</tr>
+<tr>
+<td><strong>False alarms per minute at the app's 0.64 s evaluation cadence</strong></td>
+<td><strong>5.092414</strong></td>
+</tr>
+<tr>
+<td>ADL seconds evaluated</td>
+<td>1,815.2</td>
+</tr>
+</tbody>
+</table>
+<p>A minute of walking, sitting, standing, lying down or stair-climbing produces <strong>about 5 HIGH-band windows</strong> at the app's cadence. <strong>This is the single most important limitation in this card.</strong> A HIGH band is an <em>informational UI state</em> and a queued summary; it is <strong>not</strong> an alarm, and this model is <strong>not a deployment-ready</strong> standalone fall alarm.</p>
+<p>Per-activity false-alarm rates, so the limitation is visible rather than averaged away:</p>
+<table>
+<thead>
+<tr>
+<th>Activity</th>
+<th>Rate</th>
+<th>Windows</th>
+<th>Alarms</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Walking</td>
+<td>0.011076</td>
+<td>1,896</td>
+<td>21</td>
+</tr>
+<tr>
+<td>Running</td>
+<td>0.016412</td>
+<td>1,767</td>
+<td>29</td>
+</tr>
+<tr>
+<td>Going upstairs</td>
+<td>0.025335</td>
+<td>671</td>
+<td>17</td>
+</tr>
+<tr>
+<td>Going downstairs</td>
+<td>0.044248</td>
+<td>678</td>
+<td>30</td>
+</tr>
+<tr>
+<td><strong>Jumping</strong></td>
+<td><strong>0.160615</strong></td>
+<td>716</td>
+<td>115</td>
+</tr>
+<tr>
+<td><strong>Sitting down</strong></td>
+<td><strong>0.156385</strong></td>
+<td>697</td>
+<td>109</td>
+</tr>
+<tr>
+<td>Standing up (from sofa)</td>
+<td>0.027586</td>
+<td>725</td>
+<td>20</td>
+</tr>
+<tr>
+<td><strong>Lying down (from sofa)</strong></td>
+<td><strong>0.127368</strong></td>
+<td>950</td>
+<td>121</td>
+</tr>
+<tr>
+<td>Standing up (from floor)</td>
+<td>0.031762</td>
+<td>976</td>
+<td>31</td>
+</tr>
+</tbody>
+</table>
+<p>The mechanism is visible in the table: the model's three worst confusions (jumping, sitting down, lying down) are the three activities where a body genuinely <em>drops</em> under gravity. Walking and running - the activities with the most windows - are the safest. A user who jumps, sits or lies down a lot will see noticeably more moderate/high bands.</p>
+<h3 id="post-impact-diagnostic">Post-impact diagnostic</h3>
+<p>Windows taken <em>after</em> a real impact landed are not training data, but they are scored as a diagnostic: 970 windows, 72 alarms, rate <strong>0.074227</strong>. A landed fall sits still and then gets up, so this is well behaved - but this number is a <em>diagnostic</em>, not a test-set metric, and it is labelled as such in <code>metrics.json</code>.</p>
+<h3 id="figures-mloutputsfuture_riskfigures">Figures (<code>ml/outputs/future_risk/figures/</code>)</h3>
+<p><code>fig_01_precision_recall.png</code>, <code>fig_02_roc.png</code>, <code>fig_03_calibration.png</code>, <code>fig_04_confusion_matrix.png</code>, <code>fig_05_lead_time.png</code>, <code>fig_06_example_windows.png</code>.</p>
+<hr />
+<h2 id="10-risk-bands-and-why-they-are-defensible">10. Risk bands, and why they are defensible</h2>
+<p>Thresholds are <strong>fitted on the validation split</strong> (9,591 windows, positive rate 0.129392) and then frozen:</p>
+<table>
+<thead>
+<tr>
+<th>Band</th>
+<th>Rule</th>
+<th>Threshold</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HIGH</strong></td>
+<td>the threshold maximising F1 on validation</td>
+<td><strong>&gt;= 0.314046</strong></td>
+</tr>
+<tr>
+<td><strong>MODERATE</strong></td>
+<td>the <strong>largest</strong> threshold whose validation recall is still &gt;= 0.95, capped at HIGH</td>
+<td><strong>&gt;= 0.069201</strong></td>
+</tr>
+<tr>
+<td><strong>LOW</strong></td>
+<td>below MODERATE</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p>Both numbers travel inside the model artefact and are shown in the app with the sentence that produced them ("fitted on held-out validation subjects"). The rule is in <code>metrics.json</code> (<code>risk_bands.rule</code>) and in the artefact, and the "largest threshold" search is asserted by a test - the earlier draft of this code took the <em>first</em> qualifying threshold, which silently collapsed MODERATE onto HIGH and made the middle band unreachable. That bug is now covered.</p>
+<p><code>UNAVAILABLE</code> is not a band. It is a separate state meaning "the model could not make a prediction", it is never mapped to LOW, and the backend <strong>rejects</strong> it if a client tries to upload it.</p>
+<hr />
+<h2 id="11-where-inference-runs">11. Where inference runs</h2>
+<p><strong>On the device, in the Android app.</strong> No network round-trip is needed to produce a prediction, so the tourist-facing feature works fully offline.</p>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>On-device, not a backend endpoint</td>
+<td>A prediction that needs the network fails exactly when a tourist is out of signal. It also means no accelerometer stream ever leaves the phone.</td>
+</tr>
+<tr>
+<td>Reuse <code>DecisionForest</code></td>
+<td>The app already walks the movement model's JSON forest. This model uses the <strong>same</strong> walker with <code>expectedFeatures = 22</code>. <strong>No new ML framework, runtime or serialization format was added</strong> - the only new dependency count is zero.</td>
+</tr>
+<tr>
+<td><code>expectedFeatures</code> parameter added to <code>DecisionForest.fromJson</code></td>
+<td>So a 22-feature model can load without weakening the existing 24-feature check for the movement model.</td>
+</tr>
+<tr>
+<td>Same sensor subscription</td>
+<td>The risk model is fed by the <strong>existing</strong> movement watch window (128 samples / 2.56 s, 0.64 s hop); it uses the <strong>last 50 samples</strong> of that window. No second sensor listener, no extra battery cost.</td>
+</tr>
+<tr>
+<td>Inference separate from UI</td>
+<td><code>FutureRiskFeatures</code> -&gt; <code>FutureRiskModel</code> -&gt; <code>FutureRiskAnalyzer</code> produce a <code>FutureRiskState</code>; the Compose card renders a pure <code>FutureRiskCardContent</code> built by <code>FutureRiskCardModel</code>. Both layers are independently unit-tested; the wording layer needs no emulator.</td>
+</tr>
+</tbody>
+</table>
+<p>Artefact size as shipped: <strong>1,974,297 bytes</strong> (120 trees, 66,894 nodes), i.e. the selected forest's 1,968,314 bytes plus ~6 KB of metadata (feature stats, definitions, calibration, thresholds, model card pointer).</p>
+<hr />
+<h2 id="12-three-different-things-kept-visibly-separate">12. Three different things, kept visibly separate</h2>
+<p>This is the requirement the feature was built around. The app shows all three, and each says what it is:</p>
+<table>
+<thead>
+<tr>
+<th>Shown as</th>
+<th>What it actually is</th>
+<th>Trained?</th>
+<th>Has a probability?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Geofence status</strong></td>
+<td>A <strong>configured rule</strong>: inside/outside a polygon the authority drew</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Approach risk</strong> (<code>ApproachRisk.kt</code>)</td>
+<td>A <strong>published weighted checklist</strong> over crossing history</td>
+<td>No - documented heuristic</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Future risk prediction</strong> (this card)</td>
+<td>A <strong>trained random forest</strong> over the last second of accelerometer data</td>
+<td><strong>Yes</strong></td>
+<td>Yes, calibrated</td>
+</tr>
+</tbody>
+</table>
+<p>Consequences enforced in code and tests:</p>
+<ul>
+<li>Distinct types throughout (<code>FutureRiskBand</code>/<code>FutureRiskFactor</code>/<code>FutureRiskState</code> vs <code>RiskBand</code>/<code>RiskFactor</code>), so a screen cannot render the heuristic under the trained model's heading.</li>
+<li>The card's own text names the other two and denies being them, and a test asserts that sentence exists.</li>
+<li>The card's footer states that the model <strong>never sends an SOS by itself</strong>, and a test asserts that too.</li>
+<li><strong>Risk never triggers SOS.</strong> A HIGH band raises no SOS, marks nobody as "in trouble", and changes no operational state. <code>backend/tsm/api.py</code>'s <code>state</code> computation deliberately ignores risk entirely, and <code>backend/tests/test_risk.py</code> asserts it: a HIGH prediction leaves <code>latestSos</code> empty, <code>openSosCount == 0</code> and <code>state != "SOS"</code>.</li>
+</ul>
+<hr />
+<h2 id="13-what-is-shared-with-the-authority-and-when">13. What is shared with the authority, and when</h2>
+<p>A throttled <strong>summary</strong> - never a sensor stream - goes through the app's existing offline outbox as a new <code>OutboxKind.RISK</code> event (<code>origin = ON_DEVICE_MODEL</code>, <code>isSimulated = false</code>).</p>
+<p>Policy (<code>FutureRiskReportPolicy</code>), all times measured on-device:</p>
+<table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>First MODERATE/HIGH</td>
+<td><code>FIRST_ELEVATED</code></td>
+</tr>
+<tr>
+<td>Any escalation (MODERATE -&gt; HIGH)</td>
+<td><code>ESCALATED</code> - never throttled</td>
+</tr>
+<tr>
+<td>Unchanged band after 120 s</td>
+<td><code>REFRESHED</code></td>
+</tr>
+<tr>
+<td>Falling back to LOW, once</td>
+<td><code>CLEARED</code> - so the dashboard stops showing a warning that stopped being true</td>
+</tr>
+<tr>
+<td>UNAVAILABLE or a stale band</td>
+<td>never sent</td>
+</tr>
+<tr>
+<td>LOW with nothing to clear</td>
+<td>never sent</td>
+</tr>
+</tbody>
+</table>
+<p>Payload (<code>OutboxPayloads.futureRisk</code>, validated field-by-field by <code>backend/tsm/payloads.py</code>):</p>
+<p><code>type</code> <code>RISK</code> | <code>timestampMillis</code> | <code>modelVersion</code> | <code>horizonSeconds</code> | <code>riskBand</code> (<code>LOW</code>|<code>MODERATE</code>|<code>HIGH</code> only) | <code>probability</code> (nullable) | <code>windowSamples</code> | <code>observedSamples</code> | <code>dataQuality{ok,samples,reason}</code> | <code>factors[&lt;=5]{label,detail}</code></p>
+<p>The server rejects an unreadable band, a probability outside [0,1], a non-positive or absurd horizon (ceiling 600 s), a missing version, a malformed data-quality block, and more than 5 factors. Predictions are stored in their own <code>risk_assessments</code> table with their own read-back endpoints (<code>GET /api/v1/authority/risk</code>, per-tourist history, <code>/me.latestRisk</code>), and the dashboard shows them in their own panel and tiles - never folded into the SOS queue or the incident feed.</p>
+<p>Dedupe key is the prediction instant (<code>risk:&lt;timestampMillis&gt;</code>), and the backend's event dedupe makes re-sending the same instant a <code>DUPLICATE</code> rather than a second row.</p>
+<hr />
+<h2 id="14-tests">14. Tests</h2>
+<table>
+<thead>
+<tr>
+<th>Suite</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml/future_risk/tests/test_future_risk.py</code> (93 tests)</td>
+<td>Feature arithmetic on hand-computed signals; label geometry rebuilt from the real archive; leakage (no window contains its own impact, negatives only from ADL); subject-disjoint splits; Platt monotonicity and clipping; band rule; artefact schema, size budget, byte-identity with the app asset; reference cases; provenance including the dropped trial; tuning/selection rule; model card contents</td>
+</tr>
+<tr>
+<td><code>FutureRiskFeaturesTest</code> (13)</td>
+<td>The 22 features in Kotlin, index by index, including the "no net direction" guard and the short-window refusal</td>
+</tr>
+<tr>
+<td><code>FutureRiskReferenceTest</code> (6)</td>
+<td>The <strong>shipped</strong> asset against scikit-learn's own probabilities for 16 held-out windows: feature parity, forest parity, calibration parity, and refusal of an artefact with a wrong feature schema</td>
+</tr>
+<tr>
+<td><code>FutureRiskAnalyzerTest</code> (18)</td>
+<td>Inference: band mapping at each threshold, calibrated-not-raw probability, insufficient data, implausible and non-finite readings, staleness, paused state, factor ordering, non-causal wording, determinism</td>
+</tr>
+<tr>
+<td><code>FutureRiskReportPolicyTest</code> (10)</td>
+<td>Every reporting decision, including clock-jump robustness and one-clear-only</td>
+</tr>
+<tr>
+<td><code>FutureRiskReporterTest</code> (12)</td>
+<td>Real SQLite outbox: one durable RISK row, summary-not-stream payload, no row when unconfigured, offline queue and recovery, dedupe</td>
+</tr>
+<tr>
+<td><code>FutureRiskPayloadTest</code> (8)</td>
+<td>Wire contract through a real JSON parser: null probability, non-finite handling, escaping, no coordinates or raw samples</td>
+</tr>
+<tr>
+<td><code>FutureRiskMovementIntegrationTest</code> (8)</td>
+<td>One sensor subscription for both models; no model -&gt; "prediction unavailable"; a HIGH forecast raises no fall alert; implausible window refused by both; stop keeps the last forecast</td>
+</tr>
+<tr>
+<td><code>FutureRiskCardModelTest</code> (18)</td>
+<td>What the card may say: no band when there is no prediction, no "low" for "we do not know", thresholds printed, non-causal caveat, never claims to summon help</td>
+</tr>
+<tr>
+<td><code>backend/tests/test_risk.py</code> (28)</td>
+<td>Ingest, idempotency, read-back, wire-level <code>PREDICTION</code> labelling, 12 validation rejections, and "a prediction is not an incident"</td>
+</tr>
+<tr>
+<td><code>backend/verify_integration.py</code> (33 checks)</td>
+<td>Over a <strong>real HTTP subprocess server</strong>, an outbox batch shaped as the phone builds it carries a <code>RISK</code> summary: accepted, labelled <code>PREDICTION</code>, read back from <code>/authority/risk</code> and the tourist detail with its probability and factors, counted as elevated risk while <code>sosTotal</code> stays 1, and <strong>survives a server restart</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Not executed:</strong> any on-device rendering or sensor behaviour. There is no emulator, AVD or physical device available in this environment (<code>adb devices</code> is empty), so the <code>FutureRiskCard</code> on a real screen, real permission dialogs, real GPS and the device HTTP stack remain <strong>unverified</strong>. All Android tests above are JVM/Robolectric tests.</p>
+<hr />
+<h2 id="15-limitations-the-complete-list">15. Limitations - the complete list</h2>
+<ol>
+<li><strong>False alarms.</strong> 5.09 per minute of ordinary activity at the app's cadence, and 16.3 per minute at the window stride. Not a deployable alarm (section 9).</li>
+<li><strong>Lab data.</strong> UniMiB SHAR is 30 healthy adults performing scripted activities in a lab, phone carried or pocketed. Nothing here was recorded from a tourist, outdoors, in weather, or with the phone in a bag or a moving vehicle.</li>
+<li><strong>Not the best model in the repository.</strong> <code>hist_gradient_boosting</code> reaches PR-AUC 0.8150 vs the shipped 0.7646 (section 9).</li>
+<li><strong>1 s horizon only.</strong> Not a 30-minute forecast, and no claim about any longer horizon.</li>
+<li><strong>The label is a fall impact, not a tourist incident.</strong> Every reported metric is about falls.</li>
+<li><strong>Mid-range probabilities are over-confident</strong> (section 8, bins 0.2-0.4).</li>
+<li><strong>Activity-dependent false alarms</strong> (jumping, sitting down, lying down).</li>
+<li><strong>One class of failure is unmeasurable here:</strong> the model cannot distinguish "a phone being dropped" from "a person falling" - both look like a hard impact followed by stillness. There is no phone-drop activity in the dataset, so this remains an untested failure mode.</li>
+<li><strong>Not validated end-to-end on a device</strong>, and possibly not faithful on-device: the Kotlin <code>DecisionForest</code> walk is proven against scikit-learn's numbers by test, but the whole chain (sensor -&gt; window -&gt; features -&gt; forest -&gt; card) has never run on real hardware here.</li>
+<li><strong>Licence ambiguity</strong> in the dataset (section 2).</li>
+<li><strong>The 6 excluded fall trials and the 1 corrupt recording mean the training set is not the entire dataset.</strong> Both are counted and reported rather than quietly dropped.</li>
+</ol>
+<hr />
+<h2 id="16-reproducing-this">16. Reproducing this</h2>
+<pre><code class="language-powershell"># from the repository root
+python ml/future_risk/train.py                 # full pipeline -&gt; artefacts + app assets
+python ml/future_risk/tune.py                  # the 65-config validation search (~10 min)
+python -m pytest ml/future_risk/tests -q       # 88 pipeline tests
+
+# or the whole ML suite, including this stage
+powershell -NoProfile -ExecutionPolicy Bypass -File ml\run_all.ps1 -FutureRisk
+</code></pre>
+<p><code>train.py</code> writes <code>future_risk_model.json</code> to <code>ml/outputs/future_risk/</code> <strong>and</strong> to <code>app/src/main/assets/</code>, plus <code>future_risk_reference_cases.json</code> to <code>app/src/test/resources/</code>. A test asserts the two copies are byte-identical, so the shipped model cannot drift from the trained one.</p>
+<p>Versioning: <code>config.MODEL_VERSION</code> = <code>future-risk-unimib-v1</code> is embedded in the artefact, quoted in <code>metrics.json</code>, sent in every <code>RISK</code> payload, and shown in the app. Any change to features, label geometry, hyper-parameters or calibration requires a new version string.</p>
+<p>Expected runtime: ~4 minutes for <code>train.py</code> on a modern desktop, dominated by reading <code>full_data.mat</code> and fitting the 120-tree forest.</p></body></html>

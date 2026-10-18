@@ -1,0 +1,336 @@
+<!doctype html><html><head><meta charset='utf-8'><title>model_card</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="model-card-movement-anomaly-detector-ml">Model Card — Movement Anomaly Detector (<code>ml/</code>)</h1>
+<blockquote>
+<p><strong>One-line summary.</strong> An <strong>unsupervised</strong> IsolationForest that assigns each GPS
+point a <strong>movement anomaly score</strong> (higher = more unusual relative to normal
+GeoLife movement). It is <strong>not</strong> a danger classifier and its score is <strong>not a
+probability</strong>. It supplements — it does not replace — the app's deterministic
+geo-fencing.</p>
+<p><strong>This card covers the trajectory model only.</strong> The project has <strong>two other</strong> things that are
+sometimes called "the AI", and neither is described here:</p>
+<ul>
+<li><strong>Activity recognition and impact/fall-signature detection</strong> (two <em>supervised</em> random forests over
+  24 accelerometer/gyroscope features, trained on real UCI HAR data and shipped inside the APK as
+  JSON walked by hand-written Kotlin) — see <strong><a href="model_card_movement.md"><code>model_card_movement.md</code></a></strong>.
+  That card also states plainly that UCI HAR contains <strong>no falls</strong>, so the impact detector's positives
+  are <strong>synthesised impacts injected into real recordings</strong> and its metrics are <strong>not</strong> a clinical
+  fall-detection claim.</li>
+<li><strong>The approach-risk score</strong> shown when the tourist nears a restricted area — see §9.3 of
+  <a href="../README.md"><code>README.md</code></a> or §7.8 of <a href="final_project_report.md"><code>final_project_report.md</code></a>. It is a
+  <strong>published weighted checklist, not a model</strong>: there is no labelled outcome data to fit, and it is
+  labelled as such in the UI.</li>
+</ul>
+</blockquote>
+<hr />
+<h2 id="1-model-details">1. Model details</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kind</td>
+<td><code>sklearn.ensemble.IsolationForest</code> (unsupervised) + <code>StandardScaler</code></td>
+</tr>
+<tr>
+<td>Task</td>
+<td>Unsupervised anomaly <strong>scoring</strong> of movement features</td>
+</tr>
+<tr>
+<td>Output</td>
+<td><code>movement_anomaly_score = -score_samples(scaled_features)</code>, <strong>higher = more anomalous</strong></td>
+</tr>
+<tr>
+<td><code>n_estimators</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td><code>contamination</code></td>
+<td>0.02 (used only to pick a flagging threshold, not to define truth)</td>
+</tr>
+<tr>
+<td><code>max_samples</code></td>
+<td><code>auto</code></td>
+</tr>
+<tr>
+<td>Random seed</td>
+<td>42 (reproducible bit-for-bit)</td>
+</tr>
+<tr>
+<td>Artifact</td>
+<td><code>ml/models/isolation_forest.joblib</code> (model + scaler + feature list + meta)</td>
+</tr>
+<tr>
+<td>Code</td>
+<td><code>ml/train.py</code> (fit), <code>ml/evaluate.py</code> (validation), <code>ml/predict.py</code> (inference)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Supervised?</strong> No. <strong>Labels used for training?</strong> None
+(<code>model_meta.json → "labels_used": null</code>).</p>
+<hr />
+<h2 id="2-intended-use">2. Intended use</h2>
+<ul>
+<li>Rank points/trajectories by <em>how unusual</em> their movement pattern is, for human
+  review and as an <strong>additional, independent signal</strong> alongside the deterministic
+  polygon geo-fencing.</li>
+<li>Research / prototyping on GeoLife-format trajectories.</li>
+</ul>
+<h3 id="out-of-scope-do-not-do-this">Out of scope (do NOT do this)</h3>
+<ul>
+<li><strong>Do not</strong> treat the score as a probability of danger, crime, or risk.</li>
+<li><strong>Do not</strong> use it as the sole trigger for real-world alerts.</li>
+<li><strong>Do not</strong> apply it across populations it was not trained on without
+  re-evaluation — GeoLife is dominated by a few Beijing users, so "normal" is
+  heavily biased to that region and those people.</li>
+<li><strong>Do not</strong> use it for surveillance or to infer sensitive attributes of
+  individuals.</li>
+</ul>
+<hr />
+<h2 id="3-features-14-order-fixed">3. Features (14, order fixed)</h2>
+<pre><code>speed_mps, log_dt_s, step_m, accel_mps2, turn_deg,
+speed_mean_w5, speed_std_w5, step_mean_w5, turn_mean_w5, straightness_w5,
+altitude, alt_change, tod_sin, tod_cos
+</code></pre>
+<ul>
+<li>Per-step <code>dt/step/speed/bearing</code> come from <code>common.clean_points</code> (haversine
+  distance, grouped by <code>traj_uid</code>).</li>
+<li><code>*_w5</code> are 5-point rolling means/stds; <code>straightness_w5</code> is
+  net-displacement / path-length over the window.</li>
+<li><code>tod_sin</code>/<code>tod_cos</code> encode time-of-day cyclically.</li>
+<li>All features are standardised with the <strong>training</strong> scaler before scoring.</li>
+<li>NaN at segment starts is imputed to <strong>0</strong> in scaled space (i.e. the training
+  mean) by <code>feature_matrix</code>.</li>
+</ul>
+<hr />
+<h2 id="4-training-data">4. Training data</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source</td>
+<td>Microsoft GeoLife GPS Trajectories 1.3 (real)</td>
+</tr>
+<tr>
+<td>Point sample</td>
+<td><strong>1,429,740</strong> cleaned points from <strong>1,200</strong> trajectories (fixed seed)</td>
+</tr>
+<tr>
+<td>Split</td>
+<td><strong>grouped by <code>traj_uid</code></strong> — 900 train / 300 test trajectories</td>
+</tr>
+<tr>
+<td>Train points</td>
+<td><strong>1,060,493</strong></td>
+</tr>
+<tr>
+<td>Test points</td>
+<td><strong>369,247</strong></td>
+</tr>
+<tr>
+<td>Leakage check</td>
+<td>train/test trajectory groups are <strong>disjoint</strong> (0 overlap); enforced in <code>train.py</code> and re-checked in <code>evaluate.py</code></td>
+</tr>
+</tbody>
+</table>
+<p>Grouping is by the composite key <code>user_id|trajectory_id</code> because 847 GeoLife file
+names collide across users.</p>
+<h3 id="observed-score-distribution-real">Observed score distribution (real)</h3>
+<table>
+<thead>
+<tr>
+<th>Split</th>
+<th>mean</th>
+<th>std</th>
+<th>p50</th>
+<th>p95</th>
+<th>p99</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>train</td>
+<td>0.4141</td>
+<td>0.0479</td>
+<td>0.4000</td>
+<td>0.5056</td>
+<td>0.5939</td>
+</tr>
+<tr>
+<td>test</td>
+<td>0.4080</td>
+<td>0.0437</td>
+<td>0.3959</td>
+<td>0.4853</td>
+<td>0.5810</td>
+</tr>
+</tbody>
+</table>
+<p>The test distribution closely tracks train (no obvious drift on the held-out
+trajectories).</p>
+<hr />
+<h2 id="5-evaluation-what-can-and-cannot-be-measured">5. Evaluation — what can and cannot be measured</h2>
+<p><strong>Supervised metrics are impossible.</strong> GeoLife has <strong>no anomaly / danger ground
+truth</strong>; its only labels are transportation modes. Accuracy, F1, precision,
+recall and a confusion matrix against <em>real</em> anomalies therefore <strong>cannot be
+computed</strong>. <code>evaluate.py</code> says so explicitly and reports none as if they existed.</p>
+<p>What <em>is</em> computed (<code>ml/evaluate.py</code>, on the held-out, trajectory-disjoint test
+split), with <strong>real data but synthetic labels</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Protocol</td>
+<td>GPS "teleport" burst injection</td>
+<td>3 points moved ~2.2 km N / ~1.7 km E at known indices</td>
+</tr>
+<tr>
+<td>Injected points affected</td>
+<td><strong>17,462</strong></td>
+<td>points marked anomalous</td>
+</tr>
+<tr>
+<td><strong>ROC-AUC</strong></td>
+<td><strong>0.8922</strong></td>
+<td>detector separates injected teleports from normal movement</td>
+</tr>
+<tr>
+<td><strong>Average precision</strong></td>
+<td><strong>0.6763</strong></td>
+<td>precision/recall trade-off for the rare positive class</td>
+</tr>
+<tr>
+<td><strong>Precision@k</strong> (k = 17,462)</td>
+<td><strong>0.6165</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Recall@k</strong></td>
+<td><strong>0.6165</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Label-shuffle control ROC-AUC</strong></td>
+<td><strong>0.5007</strong></td>
+<td>≈ 0.5, confirms the metric is meaningful, not an artefact</td>
+</tr>
+</tbody>
+</table>
+<h3 id="baseline-flagging-thresholds-real">Baseline flagging thresholds (real)</h3>
+<table>
+<thead>
+<tr>
+<th>Score quantile</th>
+<th>Threshold</th>
+<th>Fraction flagged</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.90</td>
+<td>0.4588</td>
+<td>10.00 %</td>
+</tr>
+<tr>
+<td>0.95</td>
+<td>0.4853</td>
+<td>5.00 %</td>
+</tr>
+<tr>
+<td>0.98</td>
+<td>0.5299</td>
+<td>2.00 %</td>
+</tr>
+<tr>
+<td>0.99</td>
+<td>0.5810</td>
+<td>1.00 %</td>
+</tr>
+<tr>
+<td>0.995</td>
+<td>0.6374</td>
+<td>0.50 %</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Interpretation limit.</strong> A high injection ROC-AUC means the detector
+discriminates <em>teleport artefacts</em> well. It does <strong>not</strong> mean it detects real
+danger. Injection is a single anomaly family; other anomaly types (detours,
+unusual stops, wrong-way movement) are <strong>not</strong> covered by this experiment.</p>
+<hr />
+<h2 id="6-explanation-interpretability">6. Explanation / interpretability</h2>
+<p><code>ml/predict.py</code> explains the top anomalous points with two model-agnostic views
+(no SHAP dependency):</p>
+<ul>
+<li><strong>z-score</strong> — how many training-std the feature lies from the training mean.</li>
+<li><strong>Leave-one-feature-out contribution</strong> — the drop in anomaly score when that
+  one feature is reset to the training mean (larger = stronger driver).</li>
+</ul>
+<p>Example (real trajectory <code>20081023025304</code>, top point):
+<code>step_m</code> value 1817.5 m (z = +14.7) and <code>speed_std_w5</code> (z = +10.5) were the
+strongest drivers.</p>
+<hr />
+<h2 id="7-limitations-known-biases">7. Limitations &amp; known biases</h2>
+<ol>
+<li><strong>No ground truth</strong> — quality against <em>real</em> anomalies is unknown and
+   currently unmeasurable with GeoLife.</li>
+<li><strong>Geographic/user bias</strong> — data is dominated by a small set of Beijing users;
+   "normal" is region- and person-specific.</li>
+<li><strong>Anomaly ≠ danger</strong> — unusual movement is frequently benign (GPS glitches,
+   new routes, transport-mode changes).</li>
+<li><strong>Altitude unreliable</strong> — GeoLife altitude is noisy; features <code>altitude</code> and
+   <code>alt_change</code> should be treated cautiously.</li>
+<li><strong>Teleport injection is easy</strong> — the 0.89 ROC-AUC is flattered by a very
+   detectable anomaly; it is an upper-ish bound for that one family.</li>
+<li><strong>Sampling</strong> — training uses a 1,200-trajectory fixed-seed sample of the
+   18,670 available, to keep runtime/memory reasonable on a 7.9 GB machine.</li>
+</ol>
+<hr />
+<h2 id="8-reproducibility-how-to-run">8. Reproducibility / how to run</h2>
+<pre><code class="language-powershell"># from the repo root
+pip install -r ml\requirements.txt
+python ml\preprocess.py --summary-scope all --sample-trajectories 1200
+python ml\eda.py
+python ml\train.py
+python ml\evaluate.py
+python ml\predict.py --plt &quot;ml\data\geolife\Geolife Trajectories 1.3\Data\000\Trajectory\20081023025304.plt&quot;
+python -m pytest ml\tests -q
+
+# or the single driver
+powershell -NoProfile -ExecutionPolicy Bypass -File ml\run_all.ps1
+</code></pre>
+<ul>
+<li>Fixed seed <strong>42</strong>; pinned dependencies in <code>ml/requirements.txt</code>.</li>
+<li>If the real dataset is absent the pipeline uses the SYNTHETIC fixture and every
+  stage prints a SYNTHETIC banner; <strong>synthetic numbers are plumbing tests, not
+  results</strong>.</li>
+</ul></body></html>

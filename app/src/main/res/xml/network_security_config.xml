@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security policy for the app's HTTP traffic.
+
+  The authority backend is the project's own server (`backend/run.py`, Python stdlib WSGI on SQLite).
+  It speaks plain HTTP on port 8080 over the local Wi-Fi / LAN — for example
+  `http://192.168.1.102:8080` — and has no TLS certificate, because it is a single-purpose server that
+  lives on the same private network as the phone.
+
+  From Android 9 (API 28) onward the platform refuses cleartext HTTP by default for any app whose
+  targetSdk is 28 or higher. This app targets API 35, so every `http://` call to the authority was
+  rejected by the platform before it ever reached the network. That is the exact source of the
+  "HTTP traffic to <host> not permitted" error shown on the tourist and officer sign-in screens: the
+  server was fine, the phone simply was not allowed to send a plain-HTTP request at all.
+
+  `cleartextTrafficPermitted="true"` re-enables plain HTTP so the phone can reach a LAN authority.
+  Without it the app cannot talk to its own backend on a real device. The exchange is confined to the
+  local network.
+
+  If the authority is ever placed behind TLS, set this back to `false` and configure the app with an
+  `https://` address.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

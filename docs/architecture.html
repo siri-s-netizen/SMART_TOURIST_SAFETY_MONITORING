@@ -1,0 +1,261 @@
+<!doctype html><html><head><meta charset='utf-8'><title>architecture</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="architecture-tourist-safety-monitoring-system">Architecture — Tourist Safety Monitoring System</h1>
+<p>This document describes the system as it actually exists in <code>D:\TouristSafetyMonitoring-src</code>.
+Everything here is derived from the source; where a component is <em>not</em> verified (e.g. on-device
+rendering), that is stated explicitly.</p>
+<hr />
+<h2 id="1-context">1. Context</h2>
+<p>A single Android application (Kotlin + Jetpack Compose) that:</p>
+<ol>
+<li>subscribes to the platform GPS (Fused Location Provider),</li>
+<li>evaluates the fix against user-drawn <strong>irregular polygons</strong> using ray casting,</li>
+<li>records readings and crossings locally (Room/SQLite),</li>
+<li>raises local notifications, and</li>
+<li>optionally keeps GPS alive in a <strong>foreground service</strong> with the screen off.</li>
+</ol>
+<p>There <strong>is</strong> a backend server and a web dashboard in this repository: <code>backend/</code> is a self-contained Flask
+app over one SQLite file that serves both the phone's API and a static operator dashboard at <code>/</code> (see §9).
+The app talks to it through a real HTTP transport; when no address is configured it falls back to a
+durable <strong>offline outbox</strong> with an honest stub transport, so nothing is ever falsely reported as delivered
+(see §6).</p>
+<hr />
+<h2 id="2-layer-map">2. Layer map</h2>
+<pre><code>app/src/main/java/com/touristsafety/app/
+├─ domain/model/         Pure Kotlin. GeoPoint, GeoFenceZone, GeoReading, GeoFenceAlert,
+│                        ZoneType, SafetyStatus, LocationSource, OutboxEvent.  (no Android)
+├─ geofencing/           Pure Kotlin. PolygonGeometry (ray casting), PolygonValidator,
+│                        RayCastingContainmentService, GeoFenceEngine (hysteresis state machine),
+│                        GeoFencePolicy, ZoneStatus, PolygonCodec.            (no Android)
+├─ data/
+│  ├─ database/          Room: AppDatabase (v3), entities, daos, DatabaseMigrations, PolygonCodec
+│  ├─ mapper/            Entity &lt;-&gt; domain mappers (enums stored by stable string keys)
+│  └─ repository/        GeoFenceRepository, LocationRepository, AlertRepository, OutboxRepository,
+│                        EmergencyContactRepository
+├─ location/             FusedLocationSource (LocationSource iface), LocationRequestSpec,
+│                        LocationPermissions, LocationTrackingService (foreground service)
+├─ tracking/             TrackingController (real-GPS pipeline), TrackingSnapshot,
+│                        BackgroundTrackingControl (start/stop the service)
+├─ simulation/           SimulationController, SimulationPathBuilder — quarantined demo data
+├─ outbox/               SyncTransport, NoBackendTransport, OutboxSyncer, OutboxPayloads
+├─ authority/            AuthorityClient, AuthorityApi (wire codec), AuthorityHttp, AuthoritySessionStore
+│                        (tourist **and** officer sessions, separate keys), AuthoritySyncTransport
+│                        + SelectingSyncTransport, hand-rolled Json
+├─ watch/                WatchController, WatchUiState, WatchHaptics, AndroidWatchHaptics
+├─ notifications/        NotificationHelper, AlertNotifier, AndroidAlertNotifier
+├─ settings/             AppSettings, SettingsRepository (DataStore)
+├─ ui/
+│  ├─ map/               MercatorProjection (pure, key-less OSM fallback)
+│  ├─ components/        SafetyMap (Google Maps path), OfflineOsmMap (key-less path), visuals
+│  ├─ screens/           Welcome (role chooser), TouristAuth (sign in / create account),
+│  │                     Officer (sign-in + register console), Home, Tracking, GeoFenceEditor,
+│  │                     ManageZones, AlertHistory, Settings, Simulation, Watch,
+│  │                     AuthorityConnection (advanced), EmergencyContacts
+│  ├─ viewmodel/         One ViewModel per screen + AppViewModelFactory
+│  └─ theme/             Fixed green/amber/red safety palette
+├─ navigation/           AppNavigation (routes, session-aware start gate, bottom bar, top-bar actions)
+├─ AppContainer.kt       Hand-rolled dependency container (single source of truth)
+├─ TouristSafetyApp.kt   Application; owns the container
+└─ MainActivity.kt       The only Activity
+</code></pre>
+<p>The dependency rule that keeps the core testable: <strong><code>domain</code> and <code>geofencing</code> depend on nothing
+Android</strong>. That is why the entire containment/state-machine core runs in plain JVM unit tests.</p>
+<hr />
+<h2 id="3-component-data-flow-diagram">3. Component / data-flow diagram</h2>
+<pre><code>                       ┌──────────────────────────────────────────────┐
+                       │                 AppContainer                 │
+                       │  one instance each of every collaborator     │
+                       └──────────────────────────────────────────────┘
+        ┌───────────────────────────────┼────────────────────────────────┐
+        │                               │                                │
+        ▼                               ▼                                ▼
+┌───────────────┐              ┌─────────────────┐              ┌──────────────────┐
+│LocationSource │  fixes       │ TrackingController│  crossings  │  AlertNotifier    │
+│(Fused/GPS)    │─────────────▶│  - GeoFenceEngine│────────────▶│ (notifications)   │
+└───────────────┘              │  - hysteresis    │              └──────────────────┘
+        ▲                      └────────┬─────────┘                      │
+        │ start/stop                    │                                ▼
+┌───────────────┐                      ▼                        ┌──────────────────┐
+│LocationTracking│  (foreground)   ┌─────────────────┐          │ OutboxRepository  │  durable
+│Service         │◀───────────────▶│  Repositories    │◀────────▶│ (outbox_events)   │  offline queue
+│ + persistent   │  setRunning()   │  (Room/SQLite)   │          └────────┬──────────┘
+│   notification │                 └─────────────────┘                   │ flush()
+└───────────────┘                       ▲                                ▼
+                                        │                        ┌──────────────────┐
+        ┌───────────────────────────────┘                        │  OutboxSyncer     │
+        │                                                         │  + SyncTransport  │
+        ▼                                                         └──────────────────┘
+┌──────────────────┐        observes         ┌───────────────────────────────┐
+│  ViewModels       │◀──────────────────────│ TrackingSnapshot (StateFlow)   │
+│  (per screen)     │                        │ + WatchController (StateFlow)  │
+└────────┬─────────┘                        └───────────────────────────────┘
+         ▼
+   Compose screens (Home, Tracking, Editor, Zones, Alerts, Settings, Simulation, Watch)
+</code></pre>
+<hr />
+<h2 id="4-the-gps-pipeline-real-tracking">4. The GPS pipeline (real tracking)</h2>
+<ol>
+<li><code>TrackingViewModel.startTracking()</code> checks runtime permission, then asks the Fused provider for
+   updates at the configured interval/accuracy (<code>AppSettings.requestSpec</code>).</li>
+<li>Each fix becomes a <code>GeoReading(point, accuracyMeters, timestampMillis, source = GPS)</code>.</li>
+<li><code>TrackingController</code> evaluates it against every <strong>enabled</strong> zone via <code>GeoFenceEngine</code>, which wraps
+   <code>RayCastingContainmentService</code>:
+   * accuracy worse than the ceiling → <code>UNCERTAIN</code> (decide nothing),
+   * within tolerance of an edge → <code>BOUNDARY</code>,
+   * accuracy circle straddles an edge → <code>UNCERTAIN</code>,
+   * otherwise ray casting → <code>INSIDE</code>/<code>OUTSIDE</code>.</li>
+<li>The engine emits a crossing <strong>only when membership changes</strong>, with hysteresis (exit margin wider
+   than entry margin) so jitter near an edge cannot produce an ENTRY/EXIT ping-pong. <code>BOUNDARY</code> and
+   <code>UNCERTAIN</code> never flip membership.</li>
+<li>The controller persists the reading (<code>LocationRepository</code>), persists any crossing
+   (<code>AlertRepository</code>), raises a notification (<code>AlertNotifier</code>) for restricted/dangerous entries, and
+   emits the crossing on <code>instantAlerts</code> for the outbox and the watch.</li>
+<li>A <code>TrackingSnapshot</code> <code>StateFlow</code> is the single UI-facing state: <code>isTracking</code>, last reading, per-zone
+   statuses, overall status, problem flags, and the <strong>true</strong> <code>foregroundServiceRunning</code> flag.</li>
+</ol>
+<p><strong>Simulation</strong> uses a completely separate <code>SimulationController</code> that owns its own engine, stamps
+every row <code>SIMULATION</code>, and never touches the Fused provider. The two pipelines never share membership
+state.</p>
+<hr />
+<h2 id="5-map-google-path-vs-key-less-fallback">5. Map: Google path vs key-less fallback</h2>
+<p><code>SafetyMap</code> chooses its implementation at runtime:</p>
+<ul>
+<li><strong>Key configured</strong> (<code>BuildConfig.MAPS_API_KEY</code> non-blank) → Google Maps via <code>maps-compose</code>, with
+  polygon/polyline overlays (saved zones, the drawn draft, the simulated route, the position fix and
+  its accuracy circle).</li>
+<li><strong>No key</strong> → <code>OfflineOsmMap</code>, a self-contained Compose <code>Canvas</code> map that renders <strong>OpenStreetMap
+  raster tiles</strong> through the pure <code>MercatorProjection</code>. Tapping still adds vertices, so the Create
+  Geo-Fence screen is fully usable with no key. If tiles cannot be fetched, it degrades to a graticule
+  grid so the screen is never blank.</li>
+</ul>
+<p>Containment maths never touches either map implementation.</p>
+<hr />
+<h2 id="6-offline-outbox-and-delivery">6. Offline outbox and delivery</h2>
+<ul>
+<li>Every crossing and every SOS is written to <code>outbox_events</code> first (unique <code>dedupe_key</code> ⇒ idempotent
+  enqueue ⇒ no duplicates on retry).</li>
+<li><code>OutboxSyncer.flush()</code> reads <code>PENDING</code> rows and offers each to a <code>SyncTransport</code>. The shipped
+  <code>SelectingSyncTransport</code> uses the real <code>AuthoritySyncTransport</code> when a base URL is configured and the
+  honest <code>NoBackendTransport</code> (transient failure, events stay queued) otherwise. The address is read at
+  flush time, so configuring one takes effect without a restart.</li>
+<li>A background retry loop re-attempts every 30 s. Retries and rejections follow the rules in §9.2: only a
+  permanent rejection discards an event.</li>
+<li>Emergency contacts ride the same outbox (<code>OutboxKind.CONTACTS</code>), so an offline edit still syncs.</li>
+<li>Routine <strong>position reports</strong> ride it too (<code>OutboxKind.POSITION</code>). <code>PositionReporter</code> watches the live
+  snapshot and, when an address is configured, enqueues a throttled real-GPS fix (default 60 s / 100 m;
+  simulated fixes and out-of-range coordinates are refused). The dashboard's "latest position" therefore
+  tracks the tourist between alerts, not only at a crossing.</li>
+</ul>
+<hr />
+<h2 id="7-concurrency-model">7. Concurrency model</h2>
+<ul>
+<li><code>AppContainer.appScope</code> — application-lifetime <code>SupervisorJob</code> on <code>Dispatchers.Default</code>. Owns the
+  settings observer, the watch driver, the alert→outbox recorder, and the outbox retry loop.</li>
+<li>The <code>LocationTrackingService</code> runs on <code>Dispatchers.Default</code> and shares the <strong>same</strong>
+  <code>TrackingController</code> as the UI (one container), so there is never a second GPS subscription.</li>
+<li>State is exposed as <code>StateFlow</code>; screens collect with <code>collectAsStateWithLifecycle</code>.</li>
+<li>Room flows are collected on the app scope; the pipeline itself is a suspend function network driven
+  by the location callback.</li>
+</ul>
+<hr />
+<h2 id="8-invariants-the-design-protects">8. Invariants the design protects</h2>
+<ol>
+<li><strong>A simulated coordinate can never be shown or stored as a real one</strong> — every location and alert
+   row (and every outbox event) carries a <code>source</code>/<code>origin</code>.</li>
+<li><strong>No circular-radius substitute</strong> for containment — ray casting on the real polygon, always.</li>
+<li><strong>No duplicate alerts</strong> — membership transitions only, plus hysteresis, plus an idempotent outbox.</li>
+<li><strong>No destructive migrations</strong> — additive migrations only; missing migration fails loudly.</li>
+<li><strong>The UI never lies about the background service</strong> — status is derived from the service lifecycle.</li>
+<li><strong>No fabricated delivery</strong> — with no server configured the watch/SOS status reads "queued", never
+   "delivered"; with a server it echoes the server's actual verdict, and only a permanent rejection
+   discards an event.</li>
+<li><strong>A simulated event is never presented as real</strong> — the <code>simulated</code> flag travels from the payload into
+   the backend's <code>events</code>, <code>sos_events</code> and <code>latest_positions</code>, and the dashboard badges it.</li>
+<li><strong>No control is ever silently dead</strong> — a submit button is gated on <em>form validity</em>, never on an
+   unrelated field, and an invalid form names the field it wants. (The bug this replaced: the tourist's
+   sign-in and registration buttons were gated on a backend address the tourist never had to enter.)</li>
+<li><strong>The two roles are two sessions, and the boundary is the server's</strong> — the tourist and officer sessions
+   live under separate keys in the same DataStore, so an officer sign-in cannot make the phone behave like
+   a tracked tourist and either sign-out leaves the other alone. The app hides nothing that matters: the
+   officer routes are <code>require_auth("authority")</code> on the server, and a tourist token gets <strong>403</strong>.</li>
+<li><strong>The app can actually reach its own authority</strong> — the manifest declares a network-security profile
+    that permits <strong>cleartext</strong> HTTP, because the authority is a plain-HTTP server on the LAN and Android 9
+    (API 28) and later block cleartext by default. Without it, every call dies with
+    <code>Cleartext HTTP traffic to &lt;host&gt; not permitted</code> before leaving the phone — looking exactly like a
+    downed server. <code>NetworkSecurityConfigTest</code> fails the build if the manifest and the profile drift apart.</li>
+</ol>
+<hr />
+<h2 id="8a-the-two-roles-and-where-the-address-lives">8a. The two roles, and where the address lives</h2>
+<pre><code>          Welcome  ──&quot;I'm a tourist&quot;──▶  TouristAuth  ──sign in / create account──▶  Home (safety)
+             │                              ▲                                        │
+             │                              └──── Sign out (clears the tourist only) ──┘
+             └──&quot;I'm an authority officer&quot;─▶  Officer  ──▶  register console (GET /authority/tourists)
+                                                 │
+                                                 └──── Officer sign out (clears the officer only)
+
+          Settings ──▶ Backend connection (advanced)   ← the address, the queue, Test connection
+</code></pre>
+<p><code>AuthoritySessionStore</code> holds <strong>two</strong> subjects (tourist and officer) plus the shared base URL, in the
+<code>authority_session</code> DataStore — deliberately <em>not</em> <code>AppSettings</code>, so signing out can never disturb the
+tracking tuning. <code>seedBaseUrlIfUnset(BuildConfig.DEFAULT_AUTHORITY_URL)</code> runs once in <code>AppContainer.start()</code>
+and is a no-op once an address exists, so a debug build can ship a working default without ever overriding
+an operator's or tourist's choice. <code>AuthorityConnectionState</code> is derived from a real <code>GET /api/v1/health</code>,
+so the screen can distinguish <em>Connected</em> from <em>Offline</em> instead of reporting success because a string was
+saved.</p>
+<hr />
+<h2 id="8b-talking-to-the-authority-over-the-lan-and-androids-cleartext-policy">8b. Talking to the authority over the LAN (and Android's cleartext policy)</h2>
+<p>The authority is a <strong>plain-HTTP</strong> server (<code>http://&lt;lan-host&gt;:8080</code>); there is no TLS, because it is a
+single-purpose service on the same private network as the phone. One class sends everything:
+<code>HttpUrlConnectionAuthorityHttp</code>, using the JDK's <code>HttpURLConnection</code> on <code>Dispatchers.IO</code>. <code>AuthorityClient</code>
+maps any <code>IOException</code> (refused, timeout, DNS, TLS) to <code>AuthorityCall.Unreachable</code>, which the outbox treats
+as <strong>transient</strong> — it keeps the event queued rather than discarding it.</p>
+<p>Android 9 (API 28) and later <strong>refuse cleartext HTTP by default</strong> for any app whose <code>targetSdk</code> is 28+; this
+app targets API 35. The platform therefore blocks a plain-HTTP request <em>before it reaches the network</em>, with
+the message <code>Cleartext HTTP traffic to &lt;host&gt; not permitted</code> — which reads like a dead server but is the
+phone refusing to send. <code>app/src/main/res/xml/network_security_config.xml</code> sets
+<code>cleartextTrafficPermitted="true"</code>, and <code>AndroidManifest.xml</code> names it via
+<code>android:networkSecurityConfig</code>. If the authority ever gains TLS, the flag goes back to <code>false</code> and the
+app is pointed at an <code>https://</code> address; <code>NetworkSecurityConfigTest</code> guards the pairing meanwhile.</p>
+<hr />
+<h2 id="9-authority-backend-backend">9. Authority backend (<code>backend/</code>)</h2>
+<h3 id="91-shape">9.1 Shape</h3>
+<p>One Flask app (<code>tsm/app.py</code>) over one SQLite file (<code>tsm/db.py</code>), with no container, no external service
+and no internet connection required. It serves two audiences: the phone (self-registration, login,
+<code>/sync/events</code>, <code>/me/contacts</code>) and the duty officer (a static dashboard at <code>/</code> plus the <code>/authority/*</code>
+routes). Accounts
+are seeded on first start; if no password is supplied through the environment, a random one is generated,
+printed <strong>once</strong>, and written to <code>backend/var/DEV_CREDENTIALS.txt</code>. No password is stored in the source.</p>
+<p>A tourist can also <strong>create their own account</strong>: <code>POST /api/v1/auth/register</code> (the only public write) mints
+the Tourist ID from a database sequence (<code>tourist_id_sequence</code>, with <code>tourists.id</code> as the primary key), hashes
+the PIN the tourist chose, returns <strong>no secret</strong> and issues <strong>no session</strong>, and reads no privilege field at
+all — so it cannot mint an operator. The new account appears in the officer's <code>GET /authority/tourists</code>
+register, where <strong>registration</strong>, <strong>tracking</strong> and the safety signals are separate fields and a tourist who
+has not reported yet shows no position rather than a fabricated one.</p>
+<h3 id="92-the-sync-contract">9.2 The sync contract</h3>
+<p><code>POST /api/v1/sync/events</code> takes one entry per queued event and returns one verdict per entry, in order.
+<code>DELIVERED</code> and <code>DUPLICATE</code> both mean the authority holds the event (the app treats a duplicate as
+success); <code>REJECTED</code> carries a reason and is permanent. <code>events</code> is append-only with a
+<code>UNIQUE (tourist_id, dedupe_key)</code> index — that index makes re-delivery harmless — and <code>sos_events</code> is a
+separate table because an SOS has a workflow (OPEN → ACKNOWLEDGED) that a routine crossing does not.</p>
+<h3 id="93-data-flow-additions">9.3 Data-flow additions</h3>
+<pre><code>   app (AuthorityClient) ──HTTP──▶ /api/v1/auth/register ──▶ tourists (+ tourist_id_sequence) · emergency_contacts
+                                     /api/v1/auth/login ──▶ sessions (expiry, device label)
+                                     /api/v1/sync/events ──▶ events (append-only) ──▶ sos_events (workflow)
+                                     /api/v1/me/contacts  ──▶ emergency_contacts
+   browser (dashboard)   ──HTTP──▶ /api/v1/authority/*    ──▶ overview · SOS queue · registered tourists · detail
+</code></pre>
+<p>Full detail — routes, payload rules, configuration, and how to run it — is in <code>backend/README.md</code>.</p></body></html>

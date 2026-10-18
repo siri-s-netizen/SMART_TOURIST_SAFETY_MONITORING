@@ -1,0 +1,2672 @@
+<!doctype html><html><head><meta charset='utf-8'><title>test_report</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="test-report-tourist-safety-monitoring-system">Test Report — Tourist Safety Monitoring System</h1>
+<p>Project root: <code>D:\TouristSafetyMonitoring-src</code>
+Date of this run: 2026-10-18
+Toolchain: JDK 21 (Temurin, <code>D:\AndroidTools\jdk-21</code>), Gradle 8.11.1, Android SDK platform 35,
+Python 3.11.9 (numpy 2.4.4, pandas 3.0.6, scikit-learn 1.8.0, matplotlib 3.11.2).</p>
+<blockquote>
+<p><strong>Honesty statement.</strong> Every result below was produced by an actual command run in this
+environment and read from the machine-generated XML / JSON / CSV artefacts. No test is marked
+PASS that was not executed, and nothing is marked as executed on a device — there is no device or
+emulator here. Where a check could not be run it is listed as <strong>NOT EXECUTED</strong> with the reason.</p>
+</blockquote>
+<hr />
+<h2 id="1-how-the-tests-were-run-exact-commands">1. How the tests were run (exact commands)</h2>
+<pre><code class="language-powershell"># Android JVM unit tests (JUnit4 + Robolectric), from the repo root
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:testDebugUnitTest&quot; &quot;--console=plain&quot;
+
+# Compile-check the instrumented (on-device) sources WITHOUT running them
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:compileDebugAndroidTestKotlin&quot; &quot;--console=plain&quot;
+
+# Build the installable debug APK
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:assembleDebug&quot; &quot;--console=plain&quot;
+
+# Python / ML tests
+cd ml
+python -m pytest tests -q                     # 86
+python -m pytest tests future_risk/tests -q   # 179 (all of them)
+</code></pre>
+<p>Raw evidence:</p>
+<ul>
+<li><code>app/build/test-results/testDebugUnitTest/*.xml</code> — per-class JUnit XML.</li>
+<li><code>app/build/reports/tests/testDebugUnitTest/index.html</code> — human-readable HTML report.</li>
+<li><code>backend/</code> — the pytest console summary (<code>python -m pytest backend/tests -q</code>) and the
+  <code>verify_integration.py</code> pass/fail line per check.</li>
+<li><code>ml/.pytest_cache/</code> and the console summary from pytest.</li>
+</ul>
+<hr />
+<h2 id="2-summary">2. Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Suite</th>
+<th>Command</th>
+<th style="text-align: right;">Executed</th>
+<th style="text-align: right;">Passed</th>
+<th style="text-align: right;">Failed</th>
+<th style="text-align: right;">Errors</th>
+<th style="text-align: right;">Skipped</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM unit (JUnit4 + Robolectric)</td>
+<td><code>:app:testDebugUnitTest</code></td>
+<td style="text-align: right;"><strong>548</strong></td>
+<td style="text-align: right;"><strong>541</strong></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">7</td>
+</tr>
+<tr>
+<td>Authority backend (pytest, in-process)</td>
+<td><code>python -m pytest backend/tests -q</code></td>
+<td style="text-align: right;"><strong>265</strong></td>
+<td style="text-align: right;"><strong>265</strong></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Authority backend acceptance (real subprocess)</td>
+<td><code>python backend/verify_integration.py</code></td>
+<td style="text-align: right;"><strong>41</strong></td>
+<td style="text-align: right;"><strong>41</strong></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Python / ML (<code>pytest</code>)</td>
+<td><code>python -m pytest ml/tests ml/future_risk/tests -q</code></td>
+<td style="text-align: right;"><strong>179</strong></td>
+<td style="text-align: right;"><strong>179</strong></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Android instrumented (<code>androidTest</code>)</td>
+<td><code>:app:compileDebugAndroidTestKotlin</code></td>
+<td style="text-align: right;">0 (compile only)</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table>
+<p>The <strong>7 skipped</strong> Android cases are the opt-in live-backend tests (<code>AuthorityLiveBackendTest</code>). They run
+only when a server address is passed with <code>-Dtsm.e2e.baseUrl</code>, so an ordinary <code>:app:testDebugUnitTest</code>
+run skips them on purpose. They were executed against a real Flask server this round and all seven passed
+— see §7.1.</p>
+<p>Android JVM breakdown (from the JUnit XML, 50 classes — ★ marks what the self-service-registration round
+touched, ▶ the earlier future-risk round, ◆ the role-separation round, ✚ the LAN-cleartext round):</p>
+<table>
+<thead>
+<tr>
+<th>Test class</th>
+<th style="text-align: right;">Tests</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>★ <code>AuthorityApiTest</code></td>
+<td style="text-align: right;">28</td>
+</tr>
+<tr>
+<td><code>PolygonGeometryTest</code></td>
+<td style="text-align: right;">22</td>
+</tr>
+<tr>
+<td><code>TilePolicyTest</code></td>
+<td style="text-align: right;">21</td>
+</tr>
+<tr>
+<td>▶ <code>FutureRiskAnalyzerTest</code></td>
+<td style="text-align: right;">18</td>
+</tr>
+<tr>
+<td>▶ <code>FutureRiskCardModelTest</code></td>
+<td style="text-align: right;">18</td>
+</tr>
+<tr>
+<td><code>PolygonValidatorTest</code></td>
+<td style="text-align: right;">18</td>
+</tr>
+<tr>
+<td>★ <code>RegistrationFormTest</code></td>
+<td style="text-align: right;">18</td>
+</tr>
+<tr>
+<td><code>GeoFenceEngineTest</code></td>
+<td style="text-align: right;">17</td>
+</tr>
+<tr>
+<td><code>AuthoritySyncTransportTest</code></td>
+<td style="text-align: right;">15</td>
+</tr>
+<tr>
+<td><code>GpsStatusTest</code></td>
+<td style="text-align: right;">15</td>
+</tr>
+<tr>
+<td>★ <code>AuthorityHttpServerTest</code></td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr>
+<td><code>GeoFenceEditorViewModelTest</code></td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr>
+<td>▶ <code>FutureRiskFeaturesTest</code></td>
+<td style="text-align: right;">13</td>
+</tr>
+<tr>
+<td><code>PolygonContainmentServiceTest</code></td>
+<td style="text-align: right;">13</td>
+</tr>
+<tr>
+<td><code>TrackingPipelineTest</code></td>
+<td style="text-align: right;">13</td>
+</tr>
+<tr>
+<td>▶ <code>FutureRiskReporterTest</code></td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr>
+<td><code>RoomPersistenceTest</code></td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr>
+<td><code>TrackingRecoveryTest</code></td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr>
+<td>★ <code>AuthorityViewModelTest</code></td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr>
+<td><code>GeofenceDiagnosticsTest</code></td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr>
+<td><code>MercatorProjectionTest</code></td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr>
+<td><code>PlaceholderWatchTest</code></td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr>
+<td><code>SimulationPathBuilderTest</code></td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr>
+<td><code>ApproachBriefingTest</code></td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td><code>ApproachRiskTest</code></td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td>▶ <code>FutureRiskReportPolicyTest</code></td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td><code>MovementAnalyzerTest</code></td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td>◆ <code>OfficerViewModelTest</code></td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td><code>OutboxPayloadsTest</code></td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td><code>GeofenceWalkthroughTest</code></td>
+<td style="text-align: right;">9</td>
+</tr>
+<tr>
+<td><code>JsonTest</code></td>
+<td style="text-align: right;">9</td>
+</tr>
+<tr>
+<td><code>PolygonCodecTest</code></td>
+<td style="text-align: right;">9</td>
+</tr>
+<tr>
+<td>◆ <code>AuthoritySessionStoreTest</code></td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td>▶ <code>FutureRiskMovementIntegrationTest</code></td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td>▶ <code>FutureRiskPayloadTest</code></td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td><code>OutboxQueueTest</code></td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td><code>SimulationControllerTest</code></td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td>★ <code>AuthorityLiveBackendTest</code></td>
+<td style="text-align: right;">7 (7 skipped by default)</td>
+</tr>
+<tr>
+<td><code>EmergencyContactRepositoryTest</code></td>
+<td style="text-align: right;">7</td>
+</tr>
+<tr>
+<td><code>MovementControllerTest</code></td>
+<td style="text-align: right;">7</td>
+</tr>
+<tr>
+<td>✚ <code>NetworkSecurityConfigTest</code></td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td>▶ <code>FutureRiskReferenceTest</code></td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td><code>PositionReportPolicyTest</code></td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td><code>PositionReporterTest</code></td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td><code>SampleAreasTest</code></td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td><code>TileDiskCacheTest</code></td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td><code>WatchControllerTest</code></td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td><code>ZoneHistoryTest</code></td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td><code>SosDeliveryStateTest</code></td>
+<td style="text-align: right;">4</td>
+</tr>
+<tr>
+<td><code>ForestReferenceTest</code></td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td style="text-align: right;"><strong>548</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Authority backend breakdown (265 tests across ten files, in-process Flask test client + temporary
+SQLite + a frozen clock):</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">Tests</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_registration.py</code></td>
+<td style="text-align: right;"><strong>45</strong></td>
+<td>self-service registration, new this round: a stranger with no credential registers and receives a mints-the-id response with <strong>no token and no secret</strong>; ids are <code>TR-&lt;year&gt;-&lt;n&gt;</code> and unique across many registrations, and a colliding text id steps over to the next number; the PIN is scrypt-hashed and neither salt nor digest is ever returned; the <code>password_*</code> columns hold an unguessable placeholder that is never the PIN; contacts are validated and stored with the new account; field-level validation; and <strong>no privilege escalation</strong> (<code>"role": "authority"</code> is 400, no session is issued, a duplicate phone is 409)</td>
+</tr>
+<tr>
+<td><code>test_payloads.py</code></td>
+<td style="text-align: right;">42</td>
+<td>the per-kind payload validators the phone's bytes must satisfy (ranges, whole numbers, <code>simulated</code> as a real bool, contact-list shape)</td>
+</tr>
+<tr>
+<td><code>test_authority.py</code></td>
+<td style="text-align: right;">33</td>
+<td>the officer routes: overview counts, the SOS queue and acknowledgement, the register, per-tourist detail, one-time-password issuance</td>
+</tr>
+<tr>
+<td><code>test_sync.py</code></td>
+<td style="text-align: right;">29</td>
+<td>the sync contract: per-entry verdicts, idempotency by <code>dedupeKey</code>, <code>DUPLICATE</code> semantics, <code>/me</code> delivery totals, latest SOS/position</td>
+</tr>
+<tr>
+<td><code>test_auth.py</code></td>
+<td style="text-align: right;">26</td>
+<td>login/logout, token expiry and revocation, role separation, the 400-vs-401 password rules</td>
+</tr>
+<tr>
+<td><code>test_pin.py</code></td>
+<td style="text-align: right;">18</td>
+<td>tourist id + PIN sign-in: PIN login, wrong-PIN indistinguishability from a wrong password, <code>PUT /me/pin</code>, and that an operator or an account without a PIN can never use one</td>
+</tr>
+<tr>
+<td><code>test_app.py</code></td>
+<td style="text-align: right;">16</td>
+<td>app wiring, <code>/health</code> <code>/healthz</code>, static dashboard serving, error-envelope shape</td>
+</tr>
+<tr>
+<td><code>test_contacts.py</code></td>
+<td style="text-align: right;">15</td>
+<td>the emergency-contact replace path and its ordering/validation</td>
+</tr>
+<tr>
+<td><code>test_security.py</code></td>
+<td style="text-align: right;">13</td>
+<td>no password (or hash/salt) appears in source, defaults, fixtures or any response</td>
+</tr>
+<tr>
+<td><code>test_risk.py</code></td>
+<td style="text-align: right;"><strong>28</strong></td>
+<td>the <code>RISK</code> prediction kind end to end: ingest + idempotency (<code>risk:&lt;timestampMillis&gt;</code> dedupe), read-back through <code>/me.latestRisk</code>, <code>/authority/risk</code> and per-tourist detail, the wire-level <code>PREDICTION</code> labelling with its disclaimer, a nullable probability, <strong>12 independent validation rejections</strong> (unreadable band, probability outside [0,1], non-positive and absurd horizon, missing model version, zero window samples, malformed/missing data-quality blocks, &gt;5 factors, a factor without a label, a missing timestamp), and the invariant that <strong>a prediction is not an incident</strong> (a HIGH band leaves <code>latestSos</code> empty, <code>openSosCount == 0</code> and <code>state != "SOS"</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Python / ML breakdown (179 tests across seven files):</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">Tests</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml/tests/test_pipeline.py</code></td>
+<td style="text-align: right;">21</td>
+<td>GeoLife <code>.plt</code> schema, cleaning, feature engineering, grouped split, reproducible training, inference</td>
+</tr>
+<tr>
+<td><code>ml/tests/test_har_models.py</code></td>
+<td style="text-align: right;">21</td>
+<td>the shipped activity + impact models: tree schema, count-not-fraction regression, scikit-learn agreement, feature-order contract, model-card honesty, app-asset byte-equality</td>
+</tr>
+<tr>
+<td><code>ml/tests/test_history.py</code></td>
+<td style="text-align: right;">13</td>
+<td>historical trajectory helpers: crossing detection against a polygon, hour/weekday/month bucketing, revisit aggregation — on fixtures, no network</td>
+</tr>
+<tr>
+<td><code>ml/tests/test_osm_eda.py</code></td>
+<td style="text-align: right;">12</td>
+<td>the Overpass-JSON parser and aggregation (element types, tag keys, feature classes, density) on a hand-written fixture — no network</td>
+</tr>
+<tr>
+<td><code>ml/tests/test_weather_eda.py</code></td>
+<td style="text-align: right;">11</td>
+<td>the weather aggregation and the documented harsh-day threshold on a fixture — no network</td>
+</tr>
+<tr>
+<td><code>ml/tests/test_transport_mode.py</code></td>
+<td style="text-align: right;">8</td>
+<td>transport-mode segment features and the subject-disjoint split rules — on fixtures</td>
+</tr>
+<tr>
+<td><code>ml/future_risk/tests/test_future_risk.py</code></td>
+<td style="text-align: right;"><strong>93</strong></td>
+<td>the future-event pipeline, see the next table</td>
+</tr>
+</tbody>
+</table>
+<p><code>ml/future_risk/tests/test_future_risk.py</code> in detail (93 tests, grouped by test class):</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th style="text-align: right;">Tests</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TestFeatureSchema</code></td>
+<td style="text-align: right;">6</td>
+<td>the vector is the width the shipped forest indexes into; every feature has a human label and formula; the geometry matches the Kotlin constants; <code>extract</code> vs <code>extract_one</code> agree and are deterministic</td>
+</tr>
+<tr>
+<td><code>TestFeatureArithmetic</code></td>
+<td style="text-align: right;">10</td>
+<td>hand-computed values on constant, free-fall, hard-landing, oscillating, quarter-turn and cancelling signals; correlations; <code>to_g</code>; the short-window and mismatched-channel refusals</td>
+</tr>
+<tr>
+<td><code>TestLabelGeometry</code></td>
+<td style="text-align: right;">8</td>
+<td>rebuilt from the raw <code>full_data.mat</code> (not the saved summary): the impact is the trial <code>argmax</code>; every positive window ends <strong>before</strong> its own impact and 1..horizon samples before it; negatives come only from ADL trials; <code>check_no_future_information()</code> passes on real data; the 10-sample stride; the window matrix is in g</td>
+</tr>
+<tr>
+<td><code>TestDataQuality</code></td>
+<td style="text-align: right;">2</td>
+<td>a NaN recording is dropped <strong>and counted</strong>, not repaired; a clean set is returned unchanged</td>
+</tr>
+<tr>
+<td><code>TestSplits</code></td>
+<td style="text-align: right;">3</td>
+<td>the split is subject-disjoint, reproducible from the seed alone, and covers every window exactly once</td>
+</tr>
+<tr>
+<td><code>TestCalibration</code></td>
+<td style="text-align: right;">6</td>
+<td>Platt scaling is the documented map, monotone and clipped at the same <code>1e-6</code> the Kotlin uses; the reliability table's shape; calibration improves Brier on held-out subjects</td>
+</tr>
+<tr>
+<td><code>TestRiskBands</code></td>
+<td style="text-align: right;">5</td>
+<td>the band rule is inclusive, ordered and fitted on validation only; the thresholds travel inside the shipped asset</td>
+</tr>
+<tr>
+<td><code>TestShippedArtefact</code></td>
+<td style="text-align: right;">12</td>
+<td>the 22-feature contract, class names, geometry and version; the forest is exported in <strong>exactly</strong> the shape <code>DecisionForest</code> walks (leaf markers, index bounds, integral counts); feature stats are complete and non-degenerate; the size budget; the app asset is <strong>byte-identical</strong> to the pipeline output</td>
+</tr>
+<tr>
+<td><code>TestReferenceCases</code></td>
+<td style="text-align: right;">4</td>
+<td>16 real windows with ≥3 distinct leads; each case's stored features and window are <strong>re-derived</strong> by the extractor; the windows are real recordings, not synthetic</td>
+</tr>
+<tr>
+<td><code>TestMeasuredResults</code></td>
+<td style="text-align: right;">14</td>
+<td>the held-out split is disjoint; a majority baseline is reported <em>and beaten</em>; the confusion matrix agrees with precision/recall/F1; the <strong>shuffled-label control is at chance</strong>; trial-level sensitivity is reported separately from window recall; per-activity false alarms; the lead-time table; post-impact windows are a diagnostic; the horizon's justification is recorded</td>
+</tr>
+<tr>
+<td><code>TestModelSelection</code></td>
+<td style="text-align: right;">5</td>
+<td>the selection rule is re-applied from <code>tuning.json</code> (best validation PR-AUC <strong>within</strong> the size budget); the unconstrained winner was rejected <strong>for size, not quality</strong>; the shipped hyper-parameters are the selected ones; the asset is that export plus small metadata</td>
+</tr>
+<tr>
+<td><code>TestProvenance</code></td>
+<td style="text-align: right;">8</td>
+<td>the archive hash and size are pinned; the source is <strong><code>full_data.mat</code>, not the pre-cut windows</strong>; the licence position ("research use, no OSI licence"); the corrupt recording recorded; the 6 no-impact fall trials counted; the subject table</td>
+</tr>
+<tr>
+<td><code>TestOutputsOnDisk</code></td>
+<td style="text-align: right;">5</td>
+<td>every promised artefact exists; the figures are real non-empty PNGs; the saved window set still describes 51,128 windows; the test predictions cover every held-out window; the reliability CSV matches the metrics table</td>
+</tr>
+<tr>
+<td><code>TestDocumentation</code></td>
+<td style="text-align: right;">5</td>
+<td>the model card exists at the path the artefact points to, quotes the <strong>measured</strong> numbers rather than rounded claims, states that the shipped model is <strong>not</strong> the best available, and says what the model cannot do</td>
+</tr>
+</tbody>
+</table>
+<p>Plus the eight future-risk classes in the Android suite (93 tests) and <code>backend/tests/test_risk.py</code>
+(28 tests) — the same feature contract, the same shipped asset and the same wire format are therefore
+checked from Python, from Kotlin and from the server.</p>
+<hr />
+<h2 id="3-the-148-enumerated-test-cases">3. The 148 enumerated test cases</h2>
+<p>Legend — <strong>Result</strong>: PASS = executed and matched the expectation.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Area</th>
+<th>Objective</th>
+<th>Expected</th>
+<th>Actual</th>
+<th>Result</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GEOF-01</td>
+<td>Geofencing</td>
+<td>A good fix well inside a polygon is classified <code>INSIDE</code></td>
+<td><code>INSIDE</code></td>
+<td><code>INSIDE</code></td>
+<td>PASS</td>
+<td><code>PolygonContainmentServiceTest › good fix well inside reports INSIDE</code></td>
+</tr>
+<tr>
+<td>GEOF-02</td>
+<td>Geofencing</td>
+<td>A good fix well outside is classified <code>OUTSIDE</code></td>
+<td><code>OUTSIDE</code></td>
+<td><code>OUTSIDE</code></td>
+<td>PASS</td>
+<td><code>PolygonContainmentServiceTest › good fix well outside reports OUTSIDE</code></td>
+</tr>
+<tr>
+<td>GEOF-03</td>
+<td>Geofencing</td>
+<td>A fix exactly on the edge is <code>BOUNDARY</code>, not a guess</td>
+<td><code>BOUNDARY</code></td>
+<td><code>BOUNDARY</code></td>
+<td>PASS</td>
+<td><code>PolygonContainmentServiceTest › point exactly on the edge reports BOUNDARY</code></td>
+</tr>
+<tr>
+<td>GEOF-04</td>
+<td>Geofencing</td>
+<td>A fix just inside the tolerance band is <code>BOUNDARY</code></td>
+<td><code>BOUNDARY</code></td>
+<td><code>BOUNDARY</code></td>
+<td>PASS</td>
+<td><code>PolygonContainmentServiceTest › point just inside the tolerance band reports BOUNDARY</code></td>
+</tr>
+<tr>
+<td>GEOF-05</td>
+<td>Geofencing</td>
+<td>Poor accuracy straddling the edge yields <code>UNCERTAIN</code> (never a fabricated inside/outside)</td>
+<td><code>UNCERTAIN</code></td>
+<td><code>UNCERTAIN</code></td>
+<td>PASS</td>
+<td><code>PolygonContainmentServiceTest › poor accuracy straddling the boundary reports UNCERTAIN not a guess</code></td>
+</tr>
+<tr>
+<td>GEOF-06</td>
+<td>Geofencing</td>
+<td>Accuracy worse than the usable maximum yields <code>UNCERTAIN</code> everywhere</td>
+<td><code>UNCERTAIN</code></td>
+<td><code>UNCERTAIN</code></td>
+<td>PASS</td>
+<td><code>PolygonContainmentServiceTest › accuracy worse than the usable maximum reports UNCERTAIN everywhere</code></td>
+</tr>
+<tr>
+<td>GEOF-07</td>
+<td>Geofencing</td>
+<td>A concave polygon's notch is genuinely outside (true ray-casting, not a radius)</td>
+<td>outside</td>
+<td>outside</td>
+<td>PASS</td>
+<td><code>PolygonContainmentServiceTest › concave polygon notch is outside</code></td>
+</tr>
+<tr>
+<td>GEOF-08</td>
+<td>Geofencing</td>
+<td>Containment is independent of vertex winding order</td>
+<td>same result both orders</td>
+<td>same</td>
+<td>PASS</td>
+<td><code>PolygonGeometryTest › containment does not depend on winding order</code></td>
+</tr>
+<tr>
+<td>GEOF-09</td>
+<td>Geofencing</td>
+<td>A polygon with fewer than 3 vertices contains nothing</td>
+<td>never inside</td>
+<td>never inside</td>
+<td>PASS</td>
+<td><code>PolygonGeometryTest › polygon with fewer than three vertices contains nothing</code></td>
+</tr>
+<tr>
+<td>GEOF-10</td>
+<td>Geofencing</td>
+<td>Distance to the boundary is measured in <strong>metres</strong>, not degrees</td>
+<td>metres</td>
+<td>metres</td>
+<td>PASS</td>
+<td><code>PolygonGeometryTest › distance to boundary is measured in metres not degrees</code></td>
+</tr>
+<tr>
+<td>GEOF-11</td>
+<td>Geofencing</td>
+<td>A self-intersecting "bow-tie" polygon is rejected</td>
+<td>rejected</td>
+<td>rejected</td>
+<td>PASS</td>
+<td><code>PolygonValidatorTest › self-intersecting bow tie is rejected</code></td>
+</tr>
+<tr>
+<td>GEOF-12</td>
+<td>Geofencing</td>
+<td>Consecutive duplicate vertices are rejected</td>
+<td>rejected</td>
+<td>rejected</td>
+<td>PASS</td>
+<td><code>PolygonValidatorTest › consecutive duplicate vertices are rejected</code></td>
+</tr>
+<tr>
+<td>GEOF-13</td>
+<td>Geofencing</td>
+<td>0/1/2 vertices are rejected and the draft reports how many are still needed</td>
+<td>rejected + count</td>
+<td>rejected + count</td>
+<td>PASS</td>
+<td><code>PolygonValidatorTest › zero one and two vertices are rejected</code> · <code>… draft validation reports how many vertices are still needed</code></td>
+</tr>
+<tr>
+<td>GEOF-14</td>
+<td>Geofencing</td>
+<td>Two overlapping zones are evaluated independently</td>
+<td>independent</td>
+<td>independent</td>
+<td>PASS</td>
+<td><code>GeoFenceEngineTest › overlapping zones are evaluated independently</code></td>
+</tr>
+<tr>
+<td>GEOF-15</td>
+<td>Geofencing</td>
+<td>Hysteresis stops alert flapping while standing on the boundary</td>
+<td>no repeat alerts</td>
+<td>no repeat alerts</td>
+<td>PASS</td>
+<td><code>GeoFenceEngineTest › hysteresis stops flapping when standing on the boundary</code></td>
+</tr>
+<tr>
+<td>GEOF-16</td>
+<td>Geofencing</td>
+<td>A disabled zone is ignored entirely</td>
+<td>ignored</td>
+<td>ignored</td>
+<td>PASS</td>
+<td><code>GeoFenceEngineTest › disabled zones are ignored entirely</code></td>
+</tr>
+<tr>
+<td>GEOF-17</td>
+<td>Geofencing</td>
+<td>Moving outside→inside a restricted zone raises <strong>exactly one</strong> ENTRY</td>
+<td>1 ENTRY</td>
+<td>1 ENTRY</td>
+<td>PASS</td>
+<td><code>GeoFenceEngineTest › moving from outside to inside a restricted zone raises exactly one ENTRY</code></td>
+</tr>
+<tr>
+<td>GEOF-18</td>
+<td>Geofencing</td>
+<td>Leaving a restricted zone raises <strong>exactly one</strong> EXIT, recorded but not a warning</td>
+<td>1 EXIT, no warning</td>
+<td>1 EXIT, no warning</td>
+<td>PASS</td>
+<td><code>GeoFenceEngineTest › leaving a restricted zone raises exactly one EXIT</code></td>
+</tr>
+<tr>
+<td>GPS-01</td>
+<td>GPS/tracking</td>
+<td>The real pipeline raises one ENTRY and persists it to the database</td>
+<td>1 ENTRY + row</td>
+<td>1 ENTRY + row</td>
+<td>PASS</td>
+<td><code>TrackingPipelineTest › outside to inside a restricted zone raises exactly one ENTRY and persists it</code></td>
+</tr>
+<tr>
+<td>GPS-02</td>
+<td>GPS/tracking</td>
+<td>Staying inside never repeats the alert</td>
+<td>no repeat</td>
+<td>no repeat</td>
+<td>PASS</td>
+<td><code>TrackingPipelineTest › staying inside a zone never repeats the alert</code></td>
+</tr>
+<tr>
+<td>GPS-03</td>
+<td>GPS/tracking</td>
+<td>Overlapping zones each alert independently through the real pipeline</td>
+<td>both alert</td>
+<td>both alert</td>
+<td>PASS</td>
+<td><code>TrackingPipelineTest › overlapping zones each alert independently</code></td>
+</tr>
+<tr>
+<td>GPS-04</td>
+<td>GPS/tracking</td>
+<td>A reading delivered via the location subscription reaches DB <strong>and</strong> UI</td>
+<td>DB + UI updated</td>
+<td>both updated</td>
+<td>PASS</td>
+<td><code>TrackingPipelineTest › a reading delivered through the subscription reaches the database and the ui</code></td>
+</tr>
+<tr>
+<td>GPS-05</td>
+<td>GPS/tracking</td>
+<td>Tracking refuses to start when location services are off</td>
+<td>refuses</td>
+<td>refuses</td>
+<td>PASS</td>
+<td><code>TrackingPipelineTest › tracking refuses to start when location services are off</code></td>
+</tr>
+<tr>
+<td>GPS-06</td>
+<td>GPS/tracking</td>
+<td>Starting twice opens exactly one location subscription (no leak)</td>
+<td>1 subscription</td>
+<td>1 subscription</td>
+<td>PASS</td>
+<td><code>TrackingPipelineTest › starting twice opens exactly one location subscription</code></td>
+</tr>
+<tr>
+<td>OFF-01</td>
+<td>Offline queue</td>
+<td>A queued event survives the process being killed (real Room/SQLite)</td>
+<td>durable</td>
+<td>durable</td>
+<td>PASS</td>
+<td><code>OutboxQueueTest › the queue survives the process being killed</code></td>
+</tr>
+<tr>
+<td>OFF-02</td>
+<td>Offline queue</td>
+<td>Enqueue is idempotent on the dedupe key — no duplicates</td>
+<td>1 row</td>
+<td>1 row</td>
+<td>PASS</td>
+<td><code>OutboxQueueTest › enqueue is idempotent on the dedupe key</code></td>
+</tr>
+<tr>
+<td>OFF-03</td>
+<td>Offline queue</td>
+<td>A transient failure stays pending and increments the attempt count</td>
+<td>pending, +1</td>
+<td>pending, +1</td>
+<td>PASS</td>
+<td><code>OutboxQueueTest › a transient failure stays pending and increments the attempt count</code></td>
+</tr>
+<tr>
+<td>OFF-04</td>
+<td>Offline queue</td>
+<td>A delivered event leaves the pending queue and is marked sent</td>
+<td>left + sent</td>
+<td>left + sent</td>
+<td>PASS</td>
+<td><code>OutboxQueueTest › a delivered event leaves the pending queue and is marked sent</code></td>
+</tr>
+<tr>
+<td>OFF-05</td>
+<td>Offline queue</td>
+<td>A permanent rejection is marked failed and not retried</td>
+<td>failed, no retry</td>
+<td>failed, no retry</td>
+<td>PASS</td>
+<td><code>OutboxQueueTest › a permanent rejection is marked failed and not retried</code></td>
+</tr>
+<tr>
+<td>OFF-06</td>
+<td>Offline queue</td>
+<td>An event is delivered <strong>exactly once</strong> when the network comes back</td>
+<td>exactly once</td>
+<td>exactly once</td>
+<td>PASS</td>
+<td><code>OutboxQueueTest › an event is delivered exactly once when the network comes back</code></td>
+</tr>
+<tr>
+<td>WATCH-01</td>
+<td>Smartwatch</td>
+<td>The watch face reflects the <strong>real</strong> tracking fix, not a synthetic coordinate</td>
+<td>real fix</td>
+<td>real fix</td>
+<td>PASS</td>
+<td><code>WatchControllerTest › the watch reflects the real fix, not a synthetic coordinate</code></td>
+</tr>
+<tr>
+<td>WATCH-02</td>
+<td>Smartwatch</td>
+<td>Entering a restricted zone vibrates <strong>once</strong>, not on every fix</td>
+<td>1 vibration</td>
+<td>1 vibration</td>
+<td>PASS</td>
+<td><code>WatchControllerTest › entering a restricted zone vibrates once, not on every fix</code></td>
+</tr>
+<tr>
+<td>WATCH-03</td>
+<td>Smartwatch</td>
+<td>A genuine re-entry vibrates again</td>
+<td>vibrates again</td>
+<td>vibrates again</td>
+<td>PASS</td>
+<td><code>WatchControllerTest › a genuine re-entry vibrates again</code></td>
+</tr>
+<tr>
+<td>WATCH-04</td>
+<td>Smartwatch</td>
+<td>SOS queues a durable event, vibrates with the SOS pattern, and stays honestly "queued" offline</td>
+<td>queued + SOS buzz</td>
+<td>queued + SOS buzz</td>
+<td>PASS</td>
+<td><code>WatchControllerTest › sos queues a durable event, vibrates and stays honestly queued offline</code></td>
+</tr>
+<tr>
+<td>WATCH-05</td>
+<td>Smartwatch</td>
+<td>SOS is reported <strong>delivered</strong> only when the transport accepts it</td>
+<td>delivered</td>
+<td>delivered</td>
+<td>PASS</td>
+<td><code>WatchControllerTest › sos is reported delivered when a transport accepts it</code></td>
+</tr>
+<tr>
+<td>ML-01</td>
+<td>ML</td>
+<td>The <code>.plt</code> schema is verified from real files (6 header lines, 7 data tokens)</td>
+<td>schema matches</td>
+<td>schema matches</td>
+<td>PASS</td>
+<td><code>tests/test_pipeline.py::test_plt_schema_verified</code>, <code>::test_real_file_schema_if_present</code></td>
+</tr>
+<tr>
+<td>ML-02</td>
+<td>ML</td>
+<td>The train/test split is grouped by trajectory so no trajectory leaks across splits</td>
+<td>0 overlap</td>
+<td>0 overlap</td>
+<td>PASS</td>
+<td><code>tests/test_pipeline.py::test_grouped_split_prevents_leakage</code></td>
+</tr>
+<tr>
+<td>ML-03</td>
+<td>ML</td>
+<td>Training is reproducible with the fixed seed</td>
+<td>identical model</td>
+<td>identical model</td>
+<td>PASS</td>
+<td><code>tests/test_pipeline.py::test_reproducible_training_with_seed</code></td>
+</tr>
+<tr>
+<td>ML-04</td>
+<td>ML</td>
+<td>Rolling features do not cross trajectory boundaries</td>
+<td>bounded per traj</td>
+<td>bounded per traj</td>
+<td>PASS</td>
+<td><code>tests/test_pipeline.py::test_features_do_not_cross_trajectory_boundaries</code></td>
+</tr>
+<tr>
+<td>ML-05</td>
+<td>ML</td>
+<td>Inference on a valid scored CSV works end to end</td>
+<td>runs + finite scores</td>
+<td>runs + finite scores</td>
+<td>PASS</td>
+<td><code>tests/test_pipeline.py::test_inference_valid_csv</code></td>
+</tr>
+<tr>
+<td>MAP-01</td>
+<td>Sample areas</td>
+<td>"Add 3 sample areas" produces exactly three zones, one of each type (restricted/dangerous/safe)</td>
+<td>3 zones, one per type</td>
+<td>3 zones, one per type</td>
+<td>PASS</td>
+<td><code>SampleAreasTest › create makes three areas, one of each type, all valid polygons</code></td>
+</tr>
+<tr>
+<td>MAP-02</td>
+<td>Sample areas</td>
+<td>Each generated area is a genuinely valid 4-vertex polygon of the requested size</td>
+<td>valid, 140 m square</td>
+<td>valid, 140 m square</td>
+<td>PASS</td>
+<td><code>SampleAreasTest › create makes three areas, one of each type, all valid polygons</code></td>
+</tr>
+<tr>
+<td>MAP-03</td>
+<td>Sample areas</td>
+<td>The areas are laid out in a row, one spacing apart, and cannot overlap</td>
+<td>~340 m apart, disjoint</td>
+<td>~340 m apart, disjoint</td>
+<td>PASS</td>
+<td><code>SampleAreasTest › the areas form a row, one spacing apart, and cannot overlap</code></td>
+</tr>
+<tr>
+<td>MAP-04</td>
+<td>Sample areas</td>
+<td>The areas stay near the user, with the middle one centred on the requested point</td>
+<td>middle at the user, all within one spacing</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>SampleAreasTest › the middle area is centred on the requested point</code> · <code>… the areas stay close to the user</code></td>
+</tr>
+<tr>
+<td>MAP-05</td>
+<td>Sample areas</td>
+<td>Longitude spacing widens towards the poles so the true distance stays ~340 m</td>
+<td>wider at 60°N; ~340 m both</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>SampleAreasTest › longitude spacing widens towards the poles to hold the distance steady</code></td>
+</tr>
+<tr>
+<td>MAP-06</td>
+<td>Sample areas</td>
+<td>Every generated area is named/described as a <strong>sample</strong>, never as real data</td>
+<td>name starts <code>Sample:</code>, description says sample</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>SampleAreasTest › every area is labelled as a sample so it is never mistaken for real data</code></td>
+</tr>
+<tr>
+<td>MAP-07</td>
+<td>Tile servers</td>
+<td>A tile template expands to the correct slippy-map URL</td>
+<td><code>…/{z}/{x}/{y}.png</code> → real URL</td>
+<td>correct URL</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › urlFor expands the slippy-map template</code></td>
+</tr>
+<tr>
+<td>MAP-08</td>
+<td>Tile servers</td>
+<td>Every mirror is a well-formed template on a <strong>distinct</strong> host (fail-over is real)</td>
+<td>≥2 mirrors, all distinct</td>
+<td>3 mirrors, distinct</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › every configured host is a usable template on a distinct host</code></td>
+</tr>
+<tr>
+<td>MAP-09</td>
+<td>Tile servers</td>
+<td>The mirror that worked last time is tried first, and the rest still wrap around</td>
+<td>preferred first, all present</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › hostsFrom prefers the remembered mirror and wraps without losing anyone</code></td>
+</tr>
+<tr>
+<td>MAP-10</td>
+<td>Tile servers</td>
+<td>Out-of-range/negative mirror indices behave sanely (no crash, no lost host)</td>
+<td>wraps, all hosts</td>
+<td>wraps, all hosts</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › hostsFrom tolerates out-of-range and negative indices</code></td>
+</tr>
+<tr>
+<td>MAP-11</td>
+<td>Tile cache</td>
+<td>A tile written to the on-disk cache is read back byte for byte</td>
+<td>identical bytes</td>
+<td>identical bytes</td>
+<td>PASS</td>
+<td><code>TileDiskCacheTest › a written tile is read back byte for byte</code></td>
+</tr>
+<tr>
+<td>MAP-12</td>
+<td>Tile cache</td>
+<td>Reading a tile that was never cached returns null instead of throwing</td>
+<td>null, no crash</td>
+<td>null, no crash</td>
+<td>PASS</td>
+<td><code>TileDiskCacheTest › reading a tile that was never written returns null instead of throwing</code></td>
+</tr>
+<tr>
+<td>MAP-13</td>
+<td>Tile cache</td>
+<td>The cache reports a correct tile count and byte size</td>
+<td>2 tiles / 150 B</td>
+<td>2 tiles / 150 B</td>
+<td>PASS</td>
+<td><code>TileDiskCacheTest › the cache reports its tile count and size</code></td>
+</tr>
+<tr>
+<td>MAP-14</td>
+<td>Tile cache</td>
+<td>When the cache exceeds its budget it drops the <strong>oldest</strong> tiles first and keeps the newest</td>
+<td>≤ budget, newest kept</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>TileDiskCacheTest › trim drops the oldest tiles until the cache fits the budget</code></td>
+</tr>
+<tr>
+<td>MAP-15</td>
+<td>Tile cache</td>
+<td>Nothing is evicted while the cache is within budget</td>
+<td>no evictions</td>
+<td>no evictions</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › nothing is evicted while the cache fits</code> · <code>… eviction stops as soon as the cache fits</code> · <code>… an input order that is not sorted is still evicted oldest-first</code></td>
+</tr>
+<tr>
+<td>MAP-16</td>
+<td>Tile cache</td>
+<td>Clearing the cache removes every tile</td>
+<td>empty</td>
+<td>empty</td>
+<td>PASS</td>
+<td><code>TileDiskCacheTest › clear removes everything</code></td>
+</tr>
+<tr>
+<td>MAP-17</td>
+<td>Tile providers</td>
+<td>At least <strong>three</strong> independent key-free providers exist, with unique ids (ids are cache folders), and the default is the canonical key-free source</td>
+<td>≥3 providers, unique ids</td>
+<td>3 providers, unique ids</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › there are at least three independent key-free providers</code> · <code>… OpenStreetMap is the default provider because it is the canonical key-free source</code></td>
+</tr>
+<tr>
+<td>MAP-18</td>
+<td>Tile providers</td>
+<td>Every provider template is https, well formed, and on a <strong>different hostname</strong> so fail-over is real, and no watermarking provider is offered</td>
+<td>all valid, hosts distinct</td>
+<td>all valid, hosts distinct</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › every provider template is well formed on its own host</code> · <code>… providers really are on different hostnames so fail-over means something</code> · <code>… CARTO is not offered at all, because it now answers with a watermark instead of a map</code></td>
+</tr>
+<tr>
+<td>MAP-19</td>
+<td>Tile providers</td>
+<td>URL expansion honours the template's own token order (Esri is <code>{z}/{y}/{x}</code>)</td>
+<td><code>{z}/{y}/{x}</code> respected</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › urlFor honours template order so y-before-x providers work</code></td>
+</tr>
+<tr>
+<td>MAP-20</td>
+<td>Tile providers</td>
+<td>Cache entries are <strong>provider-scoped</strong>, so two map styles can never be mixed up</td>
+<td>different names per provider</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › cacheName is provider-scoped so two styles can never be mixed up</code></td>
+</tr>
+<tr>
+<td>MAP-21</td>
+<td>Tile providers</td>
+<td>The fail-over order keeps the remembered provider <strong>first</strong> and silently drops nobody</td>
+<td>preferred first, all present</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › providersToTry keeps the remembered provider first</code></td>
+</tr>
+<tr>
+<td>MAP-22</td>
+<td>Tile providers</td>
+<td>A provider already known to be unreachable is skipped, and "all down" yields an empty list (give up and say so)</td>
+<td>down ones dropped; empty when all down</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>TilePolicyTest › providersToTry drops the providers already known to be unreachable</code> · <code>… providersToTry is empty when every provider is down</code></td>
+</tr>
+<tr>
+<td>EDIT-01</td>
+<td>Geo-fence editor</td>
+<td>A polygon corner can be added by <strong>typing</strong> its latitude and longitude, and a comma decimal separator is accepted</td>
+<td>vertex added; comma parsed</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>GeoFenceEditorViewModelTest › a vertex can be added from typed coordinates</code> · <code>… typed coordinates accept a comma as the decimal separator</code></td>
+</tr>
+<tr>
+<td>EDIT-02</td>
+<td>Geo-fence editor</td>
+<td>An out-of-range latitude or unparseable text is refused <strong>with a reason</strong>, never silently</td>
+<td>refused + message</td>
+<td>refused + message</td>
+<td>PASS</td>
+<td><code>GeoFenceEditorViewModelTest › an out-of-range typed coordinate is refused with a reason</code> · <code>… nonsense typed into the coordinate fields is refused with a reason</code></td>
+</tr>
+<tr>
+<td>EDIT-03</td>
+<td>Geo-fence editor</td>
+<td>A complete polygon can be drawn purely from typed coordinates and saved</td>
+<td>3 vertices, saved</td>
+<td>3 vertices, saved</td>
+<td>PASS</td>
+<td><code>GeoFenceEditorViewModelTest › a whole polygon can be drawn purely from typed coordinates</code></td>
+</tr>
+<tr>
+<td>EDIT-04</td>
+<td>Geo-fence editor</td>
+<td>A tap that lands on the previous corner is refused <strong>and explains itself</strong> (the "I have to tap twice" report)</td>
+<td>refused + message, count unchanged</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>GeoFenceEditorViewModelTest › a tap on the previous vertex is ignored rather than creating a duplicate</code> · <code>… a refused duplicate tap explains itself instead of silently doing nothing</code></td>
+</tr>
+<tr>
+<td>MOV-01</td>
+<td>Movement model</td>
+<td>The <strong>shipped</strong> activity forest reproduces scikit-learn's own probabilities on real recorded windows, on the JVM</td>
+<td>same class + probability</td>
+<td>same</td>
+<td>PASS</td>
+<td><code>ForestReferenceTest › the shipped activity model reproduces scikit-learn on real recorded windows</code></td>
+</tr>
+<tr>
+<td>MOV-02</td>
+<td>Movement model</td>
+<td>The <strong>shipped</strong> impact/fall forest does the same</td>
+<td>same class + probability</td>
+<td>same</td>
+<td>PASS</td>
+<td><code>ForestReferenceTest › the shipped fall model reproduces scikit-learn on real recorded windows</code></td>
+</tr>
+<tr>
+<td>MOV-03</td>
+<td>Movement model</td>
+<td>Both shipped models index the same 24 features in the same order as the extractor — the Python↔Kotlin contract</td>
+<td>identical order</td>
+<td>identical order</td>
+<td>PASS</td>
+<td><code>ForestReferenceTest › both shipped models index the same features in the same order as the extractor</code></td>
+</tr>
+<tr>
+<td>MOV-04</td>
+<td>Movement model</td>
+<td>Impact <strong>+</strong> the trained signature <strong>+</strong> stillness is reported as a <em>suspected</em> fall</td>
+<td>suspected fall</td>
+<td>suspected fall</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › impact plus the trained signature plus stillness is a suspected fall</code></td>
+</tr>
+<tr>
+<td>MOV-05</td>
+<td>Movement model</td>
+<td>A phone lying still is <strong>never</strong> a fall — there is no impact, so the physics gate never opens</td>
+<td>not a fall</td>
+<td>not a fall</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › a phone lying still is never a fall</code></td>
+</tr>
+<tr>
+<td>MOV-06</td>
+<td>Movement model</td>
+<td>A large impact the model does <strong>not</strong> recognise is not reported as a fall</td>
+<td>not a fall</td>
+<td>not a fall</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › an impact the model does not recognise is not reported as a fall</code></td>
+</tr>
+<tr>
+<td>MOV-07</td>
+<td>Movement model</td>
+<td>An impact followed by continued movement fails the stillness gate</td>
+<td>not a fall</td>
+<td>not a fall</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › an impact followed by continued movement fails the stillness gate</code></td>
+</tr>
+<tr>
+<td>MOV-08</td>
+<td>Movement model</td>
+<td>One fall seen by five overlapping windows raises <strong>exactly one</strong> alert</td>
+<td>1 alert</td>
+<td>1 alert</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › one fall seen by five overlapping windows raises exactly one alert</code></td>
+</tr>
+<tr>
+<td>MOV-09</td>
+<td>Movement model</td>
+<td>A second, later fall is alerted again once the cooldown has elapsed</td>
+<td>alerted again</td>
+<td>alerted again</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › a second fall after the cooldown is alerted again</code></td>
+</tr>
+<tr>
+<td>MOV-10</td>
+<td>Movement model</td>
+<td>An impact landing in the last quarter of a window is <strong>not</strong> failed for a tail it cannot measure (the gate is skipped)</td>
+<td>skipped, not failed</td>
+<td>skipped, not failed</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › a window whose impact lands at the very end is not failed for an unmeasurable tail</code></td>
+</tr>
+<tr>
+<td>MOV-11</td>
+<td>Movement model</td>
+<td>Without the trained model the state says so instead of guessing</td>
+<td>"unavailable"</td>
+<td>"unavailable"</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › without a fall model the state says so rather than guessing</code></td>
+</tr>
+<tr>
+<td>MOV-12</td>
+<td>Movement model</td>
+<td>Activity is reported only when an activity model is actually present</td>
+<td>no activity claimed</td>
+<td>no activity claimed</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › activity is reported only when an activity model is present</code></td>
+</tr>
+<tr>
+<td>MOV-13</td>
+<td>Movement model</td>
+<td>Implausible sensor samples are detected rather than averaged into the window</td>
+<td>detected</td>
+<td>detected</td>
+<td>PASS</td>
+<td><code>MovementAnalyzerTest › implausible sensor samples are detected</code></td>
+</tr>
+<tr>
+<td>MOV-14</td>
+<td>Movement model</td>
+<td>The watch opens exactly <strong>one</strong> sensor subscription, survives a second start, releases on stop, and reports a device lacking the sensors instead of pretending</td>
+<td>1 subscription; reported</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>MovementControllerTest › starting twice does not open a second sensor subscription</code> · <code>… a device without both sensors is reported, not pretended away</code> · <code>… stopping releases the watch and can be repeated</code></td>
+</tr>
+<tr>
+<td>MOV-15</td>
+<td>Movement model</td>
+<td>A build without the trained model says so instead of running blind; an implausible driver reading is skipped and reported</td>
+<td>reported</td>
+<td>reported</td>
+<td>PASS</td>
+<td><code>MovementControllerTest › a build without the trained model says so instead of running blind</code> · <code>… an implausible driver reading is skipped and reported</code></td>
+</tr>
+<tr>
+<td>MOV-16</td>
+<td>Movement model</td>
+<td>Exported tree <code>value</code> arrays are real <strong>integer class counts</strong>, not rounded fractions — regression guard for the exporter bug that would have shipped a wrong model</td>
+<td>counts; root sum ≥ 100</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>ml/tests/test_har_models.py::test_exported_values_are_integer_counts_not_rounded_fractions</code></td>
+</tr>
+<tr>
+<td>MOV-17</td>
+<td>Movement model</td>
+<td>The app ships <strong>byte-identical</strong> copies of the verified training artefacts, so "retrained but forgot to copy" cannot pass quietly</td>
+<td>identical bytes</td>
+<td>identical bytes</td>
+<td>PASS</td>
+<td><code>ml/tests/test_har_models.py::test_app_ships_the_verified_artefact</code></td>
+</tr>
+<tr>
+<td>MOV-18</td>
+<td>Movement model</td>
+<td>The model card's spec reports the <strong>real</strong> UCI HAR test-split size (2947, not the 2949 it used to claim)</td>
+<td>2947 windows</td>
+<td>2947 windows</td>
+<td>PASS</td>
+<td><code>ml/tests/test_har_models.py::test_spec_reports_the_real_test_split_size</code></td>
+</tr>
+<tr>
+<td>RISK-01</td>
+<td>Approach risk</td>
+<td>Zone severity is the dominant term and is ordered DANGEROUS &gt; RESTRICTED &gt; SAFE</td>
+<td>ordered</td>
+<td>ordered</td>
+<td>PASS</td>
+<td><code>ApproachRiskTest › zone severity is the dominant term and is ordered as intended</code></td>
+</tr>
+<tr>
+<td>RISK-02</td>
+<td>Approach risk</td>
+<td>The tourist's <strong>own</strong> recorded crossings add points, capped so history can never dominate the score</td>
+<td>capped</td>
+<td>capped</td>
+<td>PASS</td>
+<td><code>ApproachRiskTest › recent crossings count towards the score and are capped</code></td>
+</tr>
+<tr>
+<td>RISK-03</td>
+<td>Approach risk</td>
+<td>A zone the tourist has never crossed is flagged as <strong>unknown ground</strong>, not as safe</td>
+<td>unknown ground</td>
+<td>unknown ground</td>
+<td>PASS</td>
+<td><code>ApproachRiskTest › a zone the tourist has never crossed is flagged as unknown ground</code></td>
+</tr>
+<tr>
+<td>RISK-04</td>
+<td>Approach risk</td>
+<td>Proximity scales from nothing at the 200 m radius to full at the boundary, and being inside is full proximity</td>
+<td>scales; full inside</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>ApproachRiskTest › proximity scales from nothing at the radius to full at the boundary</code> · <code>… being inside the zone counts as full proximity</code></td>
+</tr>
+<tr>
+<td>RISK-05</td>
+<td>Approach risk</td>
+<td>Darkness adds points and midday does not</td>
+<td>night &gt; day</td>
+<td>night &gt; day</td>
+<td>PASS</td>
+<td><code>ApproachRiskTest › darkness adds points, midday does not</code></td>
+</tr>
+<tr>
+<td>RISK-06</td>
+<td>Approach risk</td>
+<td>An <strong>unavailable</strong> movement model is treated as neutral, never as safe</td>
+<td>neutral, not safe</td>
+<td>neutral, not safe</td>
+<td>PASS</td>
+<td><code>ApproachRiskTest › an unavailable movement model is neutral, not treated as safe</code></td>
+</tr>
+<tr>
+<td>RISK-07</td>
+<td>Approach risk</td>
+<td>The score never exceeds 100, and the listed factors account for <strong>every</strong> point of it</td>
+<td>≤ 100; factors sum to the score</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>ApproachRiskTest › the score never exceeds 100 and the factors account for every point</code></td>
+</tr>
+<tr>
+<td>RISK-08</td>
+<td>Approach risk</td>
+<td>The bands change at 30 and 60, and walking towards the boundary adds a little while standing still does not</td>
+<td>LOW/MODERATE/HIGH at 30/60</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>ApproachRiskTest › bands change at 30 and 60</code> · <code>… walking towards the boundary adds a little, standing still does not</code></td>
+</tr>
+<tr>
+<td>RISK-09</td>
+<td>Approach risk</td>
+<td>History is derived <strong>only</strong> from the requested zone, with the 7/30-day windows measured against the supplied clock and future timestamps never counted</td>
+<td>per-zone, clock-relative</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>ZoneHistoryTest › only the requested zone is summarised</code> · <code>… the seven and thirty day windows are measured against the supplied clock</code> · <code>… future timestamps are never counted in a past window</code></td>
+</tr>
+<tr>
+<td>RISK-10</td>
+<td>Approach briefing</td>
+<td>A restricted/dangerous zone within 200 m is briefed; a <strong>safe</strong> zone is never briefed however close it is; no position means no briefing</td>
+<td>briefed / never / null</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>ApproachBriefingTest › standing just outside gives a real distance and full proximity credit</code> · <code>… a safe zone is never briefed, however close it is</code> · <code>… no position means no briefing</code></td>
+</tr>
+<tr>
+<td>RISK-11</td>
+<td>Approach briefing</td>
+<td>When two boundaries are near, the <strong>higher-risk</strong> one is briefed, and equal-risk ties resolve deterministically to the closer boundary so the card cannot flicker between fixes</td>
+<td>higher risk; deterministic</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>ApproachBriefingTest › when two boundaries are near, the higher risk one is briefed</code> · <code>… equal-risk zones resolve deterministically to the closer boundary</code></td>
+</tr>
+<tr>
+<td>RISK-12</td>
+<td>Approach briefing</td>
+<td>A zone far beyond the radius is not briefed; a disabled zone is ignored; being inside is reported as zero distance; the live movement state feeds the score</td>
+<td>as expected</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>ApproachBriefingTest › a zone far beyond the radius is not briefed</code> · <code>… a disabled zone is ignored</code> · <code>… being inside the zone is reported as zero distance</code> · <code>… the live movement state feeds the score</code> · <code>… darkness raises the score for the same position</code></td>
+</tr>
+<tr>
+<td>WATCH-06</td>
+<td>Smartwatch</td>
+<td>A settled SOS delivery outcome is never walked back by a late "still queued" observation, while a newly raised SOS resets the indicator</td>
+<td>no regression; new SOS resets</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>SosDeliveryStateTest</code> (4 tests)</td>
+</tr>
+<tr>
+<td>AUTH-01</td>
+<td>Authority client</td>
+<td>A base URL without a scheme is accepted as <code>http</code> and trailing slashes are dropped</td>
+<td>accepted, normalised</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthorityApiTest › accepts a bare host by assuming http</code> · <code>… keeps an explicit scheme and drops trailing slashes</code></td>
+</tr>
+<tr>
+<td>AUTH-02</td>
+<td>Authority client</td>
+<td>An empty base URL resolves to nothing, so the client refuses to send rather than guessing</td>
+<td>resolves empty</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthorityApiTest › an empty base url resolves to nothing so the client can refuse to send</code></td>
+</tr>
+<tr>
+<td>AUTH-03</td>
+<td>Authority client</td>
+<td>Login carries the role and the device label, and a 200 with no token is a <strong>protocol error</strong>, not an empty success</td>
+<td>protocol error</td>
+<td>protocol error</td>
+<td>PASS</td>
+<td><code>AuthorityApiTest › parses a login response</code> · <code>… login body carries the role and the device label</code> · <code>… a login response without a token is a protocol error not an empty success</code></td>
+</tr>
+<tr>
+<td>AUTH-04</td>
+<td>Authority client</td>
+<td>The sync body embeds each payload as a nested object (not a quoted string) and keeps a corrupt payload as text so the server can reject it with a reason</td>
+<td>object payloads</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthorityApiTest › sync body embeds the payload as an object not a quoted string</code> · <code>… sync body keeps a corrupt payload as text so the server can reject it with a reason</code> · <code>… sync body carries every event and its kind</code></td>
+</tr>
+<tr>
+<td>AUTH-05</td>
+<td>Authority client</td>
+<td>Every delivery verdict the server can return is read, and an unknown status becomes <code>UNKNOWN</code> rather than a silent delivery</td>
+<td>no silent success</td>
+<td>no silent success</td>
+<td>PASS</td>
+<td><code>AuthorityApiTest › reads every delivery verdict the server can return</code> · <code>… an unknown status is UNKNOWN rather than silently delivered</code></td>
+</tr>
+<tr>
+<td>AUTH-06</td>
+<td>Authority client</td>
+<td>The server's own error code and message are surfaced verbatim, and a profile with no tourist object is a protocol error</td>
+<td>verbatim</td>
+<td>verbatim</td>
+<td>PASS</td>
+<td><code>AuthorityApiTest › extracts the server's own error code and message</code> · <code>… a profile with no tourist object is a protocol error</code></td>
+</tr>
+<tr>
+<td>AUTH-07</td>
+<td>Authority transport</td>
+<td>A <code>DELIVERED</code> verdict is reported with the acknowledgement id; a <code>DUPLICATE</code> counts as delivered because the server already holds it</td>
+<td>delivered / delivered</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthoritySyncTransportTest › a delivered verdict is reported with the acknowledgement id</code> · <code>… a duplicate verdict counts as delivered because the server already has it</code></td>
+</tr>
+<tr>
+<td>AUTH-08</td>
+<td>Authority transport</td>
+<td><code>REJECTED</code> fails the event with the server's reason; an HTTP 400 fails it because the same bytes can never be accepted</td>
+<td>failed + reason</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthoritySyncTransportTest › a rejected verdict fails the event with the server's reason</code> · <code>… http 400 fails the event because the same bytes can never be accepted</code></td>
+</tr>
+<tr>
+<td>AUTH-09</td>
+<td>Authority transport</td>
+<td>A 401, an expired token, a 500 and a dead network all <strong>keep the event queued</strong> (a configuration mistake must never discard it)</td>
+<td>queued</td>
+<td>queued</td>
+<td>PASS</td>
+<td><code>AuthoritySyncTransportTest › http 401 keeps the event queued because re-signing-in will deliver it</code> · <code>… http 500 keeps the event queued</code> · <code>… a dead network keeps the event queued</code> · <code>… an expired token is treated as not signed in rather than sent and rejected</code></td>
+</tr>
+<tr>
+<td>AUTH-10</td>
+<td>Authority transport</td>
+<td>With no address, or an address but no sign-in, the event stays queued and says why; the selector uses the honest no-backend transport until an address exists</td>
+<td>queued + reason</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthoritySyncTransportTest › with no address configured the event stays queued and says so</code> · <code>… with an address but no sign-in the event stays queued</code> · <code>… the selector uses the honest no-backend transport until an address exists</code></td>
+</tr>
+<tr>
+<td>AUTH-11</td>
+<td>Authority transport</td>
+<td>A non-JSON success body, a response with no verdict for our event, or an unrecognised verdict is never treated as a delivery</td>
+<td>not delivered</td>
+<td>not delivered</td>
+<td>PASS</td>
+<td><code>AuthoritySyncTransportTest › a non-json success body is a protocol error, not a delivery</code> · <code>… a response with no verdict for our event keeps it queued</code> · <code>… an unrecognised verdict keeps the event queued</code></td>
+</tr>
+<tr>
+<td>AUTH-12</td>
+<td>Real socket</td>
+<td>The client delivers over a <strong>real TCP socket</strong> to a hand-rolled HTTP/1.1 server; method, path, bearer header and body are verified byte-for-byte</td>
+<td>real HTTP</td>
+<td>real HTTP</td>
+<td>PASS</td>
+<td><code>AuthorityHttpServerTest › the transport delivers through a real socket</code> · <code>… a sync batch really reaches the server with the expected bytes</code> · <code>… login posts the credentials and reads the token back</code></td>
+</tr>
+<tr>
+<td>AUTH-13</td>
+<td>Real socket</td>
+<td>A closed port is <code>Unreachable</code> (no exception escapes), a gateway error page is an <code>HttpError</code>, a truncated body is a protocol error, and a 401 keeps the event queued</td>
+<td>no escaped exception</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthorityHttpServerTest › a closed port is Unreachable rather than an exception escaping</code> · <code>… a gateway error page is an HttpError, never a success</code> · <code>… a truncated json body is a protocol error, not a delivery</code> · <code>… a 401 from a real server keeps the event queued</code></td>
+</tr>
+<tr>
+<td>AUTH-14</td>
+<td>JSON codec</td>
+<td>The hand-rolled codec round-trips nested objects/arrays/unicode, writes whole numbers <strong>without a decimal point</strong> (so the server's integer validator accepts them), rejects truncated/trailing documents, and degrades instead of throwing</td>
+<td>round-trip</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>JsonTest</code> (9 tests)</td>
+</tr>
+<tr>
+<td>AUTH-15</td>
+<td>Emergency contacts</td>
+<td><code>replaceAll</code> assigns priority from list position, never leaves a partial list, drops what is gone, stores a null relationship, escapes quotes, and uploads the stored order</td>
+<td>whole-list replace</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>EmergencyContactRepositoryTest</code> (7 tests)</td>
+</tr>
+<tr>
+<td>AUTH-16</td>
+<td>Outbox payloads</td>
+<td>SOS marks itself SIMULATED and tolerates a missing fix; the contacts payload is a whole-list replace with an ordered priority; dedupe keys are stable</td>
+<td>as expected</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>OutboxPayloadsTest</code> (10 tests)</td>
+</tr>
+<tr>
+<td>AUTH-17</td>
+<td>Authority client</td>
+<td>A PIN sign-in carries the PIN and <strong>omits</strong> the password (an empty password is a 400, so it must not be sent), the set-PIN body is a single field, and a profile's stored <code>latestPosition</code> is parsed with its accuracy and simulated flag</td>
+<td>PIN only</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthorityApiTest › pin login body carries the PIN instead of a password</code> · <code>… pin body is a single field</code> · <code>… parses the authority's stored position</code></td>
+</tr>
+<tr>
+<td>POS-01</td>
+<td>Offline position sync</td>
+<td>A <strong>real</strong> GPS fix is queued as a durable <code>POSITION</code> event; a simulated fix and an out-of-range coordinate are <strong>never</strong> queued; nothing is queued until an authority address is configured, and once it is, the pending fix is reported immediately rather than lost</td>
+<td>real-only, gated</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>PositionReporterTest</code> (6 tests) · <code>PositionReporter</code></td>
+</tr>
+<tr>
+<td>POS-02</td>
+<td>Position-report policy</td>
+<td>The first fix is always reported; a stationary tourist is re-reported once the interval elapses; a ~11 m nudge inside the interval is suppressed but a ~222 m move is reported; a disabled policy and a backwards clock are handled</td>
+<td>interval + distance</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>PositionReportPolicyTest</code> (6 tests)</td>
+</tr>
+<tr>
+<td>POS-03</td>
+<td>Position payload</td>
+<td>The <code>POSITION</code> payload carries the coordinates, source and device timestamp, writes <code>null</code> accuracy rather than invalid JSON for a non-finite value, and its dedupe key is a function of the fix timestamp</td>
+<td>valid JSON</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>OutboxPayloadsTest › position payload carries the fix, its source and its timestamp</code> · <code>… position payload writes null accuracy rather than invalid json for a non-finite value</code> · <code>… position dedupe key is a function of the fix timestamp</code></td>
+</tr>
+<tr>
+<td>FRISK-01</td>
+<td>Future-risk features</td>
+<td>The 22 features are computed and <strong>frame the forest contract</strong>: hand-checkable values on constant, free-fall, hard-landing, oscillation, quarter-turn and cancelling signals; the "no net direction" guard returns 0 instead of dividing by ~zero; a short window and mismatched channels are refused; the Python and Kotlin feature orders agree</td>
+<td>22, hand-checked</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>FutureRiskFeaturesTest</code> (13) · <code>ml/future_risk/tests</code> <code>TestFeatureSchema</code>/<code>TestFeatureArithmetic</code></td>
+</tr>
+<tr>
+<td>FRISK-02</td>
+<td>Model loading + inference consistency</td>
+<td>The <strong>shipped</strong> asset, re-walked on the JVM, reproduces scikit-learn's own probabilities for <strong>16 real held-out windows</strong> (feature parity; forest parity worst 5.9e-04, mean &lt; 5e-04 on a step function; Platt calibration); an artefact whose feature <strong>names</strong> do not match is refused rather than mis-indexed; the app asset is <strong>byte-identical</strong> to the pipeline output</td>
+<td>parity</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>FutureRiskReferenceTest</code> (6) · <code>ml/future_risk/tests</code> <code>TestShippedArtefact</code>/<code>TestReferenceCases</code></td>
+</tr>
+<tr>
+<td>FRISK-03</td>
+<td>Leakage prevention</td>
+<td>Rebuilt from the raw <code>full_data.mat</code>: every positive window ends strictly <strong>before</strong> its own impact; negatives come only from ADL trials; the impact is the trial <code>argmax</code>; <strong>no fitted preprocessing exists</strong> at all; a <strong>shuffled-label control</strong> (same features, same pipeline, permuted labels) scores near chance</td>
+<td>no leakage</td>
+<td>chance control 0.477</td>
+<td>PASS</td>
+<td><code>ml/future_risk/tests</code> <code>TestLabelGeometry</code>/<code>TestCalibration</code>/<code>TestMeasuredResults</code> · <code>ml/outputs/future_risk/metrics.json</code> (<code>leakage_checks</code>)</td>
+</tr>
+<tr>
+<td>FRISK-04</td>
+<td>Probability ↔ category mapping</td>
+<td>The band rule is inclusive and ordered and fitted on <strong>validation only</strong>, and the thresholds travel inside the artefact and the Kotlin constants: <strong>HIGH ≥ 0.314046</strong>, <strong>MODERATE ≥ 0.069201</strong>; the figure displayed is the <strong>calibrated</strong> probability, never the raw vote; LOW is never shown for "we do not know"</td>
+<td>ordered, calibrated</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>FutureRiskAnalyzerTest</code> (18) · <code>FutureRiskCardModelTest</code> (18) · <code>ml/future_risk/tests</code> <code>TestRiskBands</code></td>
+</tr>
+<tr>
+<td>FRISK-05</td>
+<td>Insufficient / implausible / stale data</td>
+<td>Fewer than 50 samples reports <strong>insufficient data</strong>; an implausible (&gt; 16 g) or non-finite reading is refused; a forecast older than 10 s is reported <strong>stale</strong>; a paused watch and a build with no model report "prediction unavailable" rather than a guess</td>
+<td>honest states</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>FutureRiskAnalyzerTest</code> (18) · <code>FutureRiskMovementIntegrationTest</code> (8)</td>
+</tr>
+<tr>
+<td>FRISK-06</td>
+<td>Offline queueing + recovery</td>
+<td>Against a <strong>real SQLite outbox</strong>: one durable <code>RISK</code> row carrying a <strong>summary</strong> (not a sensor stream), nothing queued when no address is configured, queue-then-recover after an offline spell, and stable dedupe; no coordinates or raw samples appear in the payload</td>
+<td>durable, summary-only</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>FutureRiskReporterTest</code> (12) · <code>FutureRiskPayloadTest</code> (8)</td>
+</tr>
+<tr>
+<td>FRISK-07</td>
+<td>Distinction &amp; no automatic SOS</td>
+<td>The movement watch feeds <strong>both</strong> models from <strong>one</strong> subscription; a HIGH forecast raises <strong>no</strong> fall alert and changes no operational state; the card names the configured-geofence status and the approach-risk checklist as different things and states the factors are <strong>non-causal</strong> and that the model <strong>never sends an SOS</strong></td>
+<td>three things apart</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>FutureRiskMovementIntegrationTest</code> (8) · <code>FutureRiskCardModelTest</code> (18)</td>
+</tr>
+<tr>
+<td>FRISK-08</td>
+<td>API auth + validation</td>
+<td>The <code>RISK</code> kind is authenticated like any tourist event, validated at the wire level (<strong>12 independent rejections</strong>: band, probability range, horizon, model version, window samples, data-quality block, factor ceiling, missing fields), <code>UNAVAILABLE</code> is rejected outright, ingestion is idempotent by <code>risk:&lt;timestampMillis&gt;</code>, and a HIGH prediction leaves <code>latestSos</code> empty and <code>state != "SOS"</code> — <strong>a prediction is not an incident</strong></td>
+<td>reject / not an incident</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_risk.py</code> (28)</td>
+</tr>
+<tr>
+<td>FRISK-09</td>
+<td>Dashboard integration</td>
+<td><code>GET /authority/risk</code>, the per-tourist history and the overview's <code>riskAssessments</code>/<code>riskElevated</code> counts return the fields the new <strong>"Future-risk predictions"</strong> panel renders, labelled <code>kind: "PREDICTION"</code> with a disclaimer and kept out of the SOS queue and the incident feed</td>
+<td>prediction rows</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_risk.py</code> (28)</td>
+</tr>
+<tr>
+<td>FRISK-10</td>
+<td>E2E prediction delivery (no device)</td>
+<td>Over a <strong>real HTTP subprocess server</strong>, an outbox batch shaped exactly as the phone builds it carries a <code>RISK</code> summary (origin <code>ON_DEVICE_MODEL</code>): it is accepted, labelled <code>PREDICTION</code>, read back from <code>/authority/risk</code> and the tourist detail with its probability and factors, counted as elevated risk while <code>sosTotal</code> stays 1, and <strong>survives a server restart</strong></td>
+<td>end-to-end over HTTP</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>verify_integration.py</code> (41/41; "the on-device future-risk summary reaches the authority dashboard" · "… raises NO incident or SOS" · "the future-risk prediction survived the restart")</td>
+</tr>
+<tr>
+<td>ROLE-01</td>
+<td>Role separation (server)</td>
+<td>The officer register <code>GET /authority/tourists</code> is a <strong>server-side</strong> boundary, not a hidden screen: an officer token reads it; a <strong>tourist</strong> token presented to the same route is refused with <strong>403</strong>; an unauthenticated request is <strong>401</strong></td>
+<td>403 for a tourist</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_auth.py</code> (26) · <code>AuthorityLiveBackendTest › the officer console reads the register and a tourist token is refused it</code> (a tourist token over a real socket → 403) · <code>AuthorityHttpServerTest › a tourist token refused by the officer route is an HttpError, not an empty register</code></td>
+</tr>
+<tr>
+<td>ROLE-02</td>
+<td>Officer credential check</td>
+<td>Officer sign-in posts the officer id and password and stores an <strong>officer</strong> session; a refused officer sign-in stores <strong>nothing</strong> and says only that the pair was not accepted (so officer ids cannot be enumerated); an unreachable authority is named as unreachable, not as bad credentials; blank credentials and a blank address are refused <strong>before</strong> any request leaves the phone; a 403 reading the register drops the session</td>
+<td>officer session only</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>OfficerViewModelTest</code> (10) · <code>AuthorityLiveBackendTest › the officer console reads the register and a tourist token is refused it (officer sign-in)</code></td>
+</tr>
+<tr>
+<td>ROLE-03</td>
+<td>Two independent sessions</td>
+<td>The tourist session and the officer session are stored under <strong>separate keys</strong>: an officer sign-in does <strong>not</strong> make the phone a tracked tourist; signing the tourist out does <strong>not</strong> evict the officer (and the reverse); both are restored after the store is torn down and rebuilt, together with the configured address</td>
+<td>independent, durable</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthoritySessionStoreTest</code> (8, real on-disk DataStore) · <code>OfficerViewModelTest › an officer sign-in does not sign a tourist in on the same phone</code> · <code>… signing out revokes the token and clears only the officer session</code></td>
+</tr>
+<tr>
+<td>ROLE-04</td>
+<td>Address no longer gates the tourist</td>
+<td>The submit controls are gated on <strong>form validity</strong>, never on a backend address being present: with nothing configured the form still validates field by field, names every missing field, and refuses only what is genuinely invalid</td>
+<td>form, not address</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>RegistrationFormTest</code> (18: <code>a complete form reports no field problems</code>, <code>each empty field is reported against its own field, not as one lump</code>, <code>a mismatched confirmation is reported on the confirmation field while the pin stays clean</code>, <code>a non-numeric pin is reported as digits only</code>, <code>the outstanding list names only what is actually missing</code>) · <code>AuthorityViewModelTest › a blank address is refused before any call is attempted</code> (the <em>submission</em> is refused with a named reason — the <em>button</em> is live)</td>
+</tr>
+<tr>
+<td>ROLE-05</td>
+<td>Build-time default address</td>
+<td>A debug build can carry a default address (<code>-PAUTHORITY_URL</code> / <code>TSM_AUTHORITY_URL</code> / <code>local.properties</code>); it is written to the session store <strong>only when nothing is configured</strong>, and can never overwrite an address the user has chosen</td>
+<td>seed once</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthoritySessionStoreTest › seedBaseUrlIfUnset writes only when nothing has been configured</code> · <code>… ignores an empty default so an unconfigured build stays unconfigured</code> · this release's <code>BuildConfig.DEFAULT_AUTHORITY_URL == "http://192.168.1.102:8080"</code>, present in the packaged dex</td>
+</tr>
+<tr>
+<td>ROLE-06</td>
+<td>Officer register rendering (client)</td>
+<td>The register rows parse with <strong>registration</strong>, <strong>tracking</strong> and the safety signals as three separate claims; a row with no position carries <code>hasPosition=false</code> and a null position rather than a fabricated <code>0,0</code>; a row with no Tourist ID is dropped rather than rendered anonymously</td>
+<td>labelled, not invented</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthorityApiTest</code> +6 (<code>parseTourists</code>) · <code>AuthorityHttpServerTest › the officer register is fetched with the officer bearer token and parsed end to end</code> · <code>AuthorityLiveBackendTest</code> (every live row asserted to carry an id and both statuses, and to have a position only when it claims one)</td>
+</tr>
+<tr>
+<td>NET-01</td>
+<td>LAN cleartext policy</td>
+<td>The app declares a network-security profile that permits the <strong>cleartext</strong> HTTP the LAN authority needs, and the manifest points at it: with <code>targetSdk 35</code> and no such profile, <strong>every</strong> call dies with <code>Cleartext HTTP traffic to &lt;host&gt; not permitted</code> before a single byte leaves the phone — which the sign-in screens can only report as "the authority is not answering"</td>
+<td>cleartext permitted; manifest wired</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>NetworkSecurityConfigTest</code> (3 tests) — reads the shipped <code>AndroidManifest.xml</code> and <code>res/xml/network_security_config.xml</code> and fails if the pair drifts; confirmed in the built APK (<code>aapt2 dump xmltree</code>: <code>android:networkSecurityConfig=@0x7f0c0002</code> → <code>res/xml/network_security_config.xml</code>)</td>
+</tr>
+<tr>
+<td>REG-01</td>
+<td>Self-registration</td>
+<td>A tourist with <strong>no credential at all</strong> registers themselves and receives a response carrying the minted Tourist ID and the account's own non-secret fields — <strong>no token, no password, no PIN, no salt, no digest</strong> — and registering does <strong>not</strong> sign them in</td>
+<td>201 + id, no secret</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_registration.py</code> (45) · <code>verify_integration.py</code> ("a tourist self-registers and the database mints a TR-<year>-<n> id" · "the registration response carries the id but no token and no secret") · <code>RegistrationFormTest</code> (18) · <code>AuthorityApiTest</code> (28)</td>
+</tr>
+<tr>
+<td>REG-02</td>
+<td>Unique Tourist ID</td>
+<td>The id is minted by the <strong>database</strong> (<code>tourist_id_sequence</code> + the <code>tourists.id</code> primary key), not by the client; twelve sequential registrations get twelve distinct ids in <code>TR-&lt;year&gt;-&lt;5 digits&gt;</code> form; a colliding text id steps over to the next number; the counter is never reset</td>
+<td>unique, DB-minted</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_registration.py</code> · live: the production client received <code>TR-2026-00001</code></td>
+</tr>
+<tr>
+<td>REG-03</td>
+<td>Registration validation + uniqueness</td>
+<td>Blank/over-long name, blank phone, a PIN that is not 4–8 digits, a mismatched confirmation, a half-filled contact row and too many contacts are all refused with a specific message; a duplicate phone number is <strong>409</strong>, and validation happens <strong>before</strong> any request leaves the phone</td>
+<td>400 / 409, specific</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_registration.py</code> · <code>RegistrationFormTest</code> (18) · <code>AuthorityViewModelTest</code> (11) · <code>AuthorityHttpServerTest</code> (14)</td>
+</tr>
+<tr>
+<td>REG-04</td>
+<td>No privilege escalation</td>
+<td>The public registration endpoint creates only tourists: it reads <strong>no</strong> privilege field, <code>"role": "authority"</code> is <code>400</code>, an operator account can never be minted this way, registration issues no session, and the option to self-assign an authority role does not exist</td>
+<td>tourist only</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_registration.py</code> · <code>verify_integration.py</code> ("a registration cannot mint an authority account")</td>
+</tr>
+<tr>
+<td>REG-05</td>
+<td>Registered-tourist listing</td>
+<td>The officer's authenticated <code>GET /authority/tourists</code> shows the new account (id, name, <strong>registration date</strong>, source <code>SELF</code>) with <strong>registration</strong>, <strong>tracking</strong> and the safety signals in separate fields — a tourist who has not reported yet reads <code>AWAITING_FIRST_REPORT</code> / <code>hasPosition=false</code> / <code>latestPosition=null</code> rather than a fabricated position — and a tourist token is still <code>403</code> on that route</td>
+<td>authenticated, separated</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_registration.py</code> · <code>verify_integration.py</code> ("the self-registered tourist appears on the officer's dashboard…" · "registration and tracking are separate…" · "the self-registered account survived the restart") · <code>AuthorityLiveBackendTest</code> ("a self-registered tourist appears on the authority dashboard and then reports a position") · <code>AuthorityHttpServerTest</code> ("the officer register is fetched with the officer bearer token and parsed end to end")</td>
+</tr>
+<tr>
+<td>PIN-01</td>
+<td>Backend PIN</td>
+<td>A tourist can sign in with an id + PIN; a wrong PIN is indistinguishable from a wrong password (same 401 body); <code>PUT /me/pin</code> accepts only 4–8 digits; an operator or a PIN-less account can never use a PIN</td>
+<td>id + PIN</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_pin.py</code> (18 tests)</td>
+</tr>
+<tr>
+<td>ACK-01</td>
+<td>Authority acknowledgement</td>
+<td>An officer acknowledgement moves SOS <code>OPEN → ACKNOWLEDGED</code> with the officer id and time, and <code>GET /me</code> returns it to the tourist together with the stored position</td>
+<td>ack + position</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_authority.py</code> · <code>backend/tests/test_sync.py</code>; live-verified in <code>AuthorityLiveBackendTest</code> (<code>latestSos=OPEN</code>, <code>latestPosition: 18.5204,73.8567</code>)</td>
+</tr>
+<tr>
+<td>LIVE-01</td>
+<td>Live end-to-end</td>
+<td>The production Kotlin client against a real <code>run.py</code>: <strong>self-registration → the server-minted Tourist ID → signing in with that id and PIN → appearing under <em>Registered Tourists</em> with no position → gaining a real position</strong>, SOS delivery + idempotency + officer queue, a position report landing on the authority map, PIN set + PIN sign-in (wrong PIN → 401), the <strong>in-app officer console reading the register with an officer token while a tourist token is refused 403</strong>, a dead backend leaving the event queued with its reason, and an <strong>on-device future-risk summary</strong> stored as a <code>PREDICTION</code> that raises no SOS</td>
+<td>7/7</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>AuthorityLiveBackendTest</code> (7 tests, <code>skipped="0"</code> when run with <code>-Dtsm.e2e.baseUrl</code>) — see §7.1</td>
+</tr>
+<tr>
+<td>BE-01</td>
+<td>Backend</td>
+<td>The sync response is <code>{results:[…], serverTimeMillis}</code> with one verdict per entry, in order; re-delivering the same batch returns <code>DUPLICATE</code> and never duplicates the row</td>
+<td>idempotent</td>
+<td>idempotent</td>
+<td>PASS</td>
+<td><code>backend/tests/test_sync.py</code> (29) · <code>verify_integration.py</code> ("re-delivering the same batch is reported DUPLICATE, never duplicated")</td>
+</tr>
+<tr>
+<td>BE-02</td>
+<td>Backend</td>
+<td>SOS position is optional (a tourist with no fix can still call for help); a <code>simulated</code> SOS is stored and surfaced as <strong>simulated</strong>, never as real</td>
+<td>optional; badged</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_payloads.py</code> (42) · <code>verify_integration.py</code> ("the SOS is marked SIMULATED, so it cannot be mistaken for a real one")</td>
+</tr>
+<tr>
+<td>BE-03</td>
+<td>Backend</td>
+<td>A tourist token cannot reach the authority API, authority routes reject an unauthenticated request, and tokens expire and can be revoked</td>
+<td>401 / 403</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_auth.py</code> (26) · <code>verify_integration.py</code> ("a tourist token cannot reach the authority API")</td>
+</tr>
+<tr>
+<td>BE-04</td>
+<td>Backend</td>
+<td>No password is hard-coded: the first start generates one, prints it <strong>once</strong>, writes it to a file, and no salt/hash ever leaves the server</td>
+<td>generated once</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_security.py</code> (13) · <code>verify_integration.py</code> ("first start generated an authority account (not a hard-coded password)")</td>
+</tr>
+<tr>
+<td>BE-05</td>
+<td>Backend</td>
+<td>An emergency-contact upload replaces the whole list and reads back with a count</td>
+<td>replaced</td>
+<td>replaced</td>
+<td>PASS</td>
+<td><code>backend/tests/test_contacts.py</code> (15) · <code>verify_integration.py</code> ("emergency contacts upload and read back")</td>
+</tr>
+<tr>
+<td>BE-06</td>
+<td>Backend</td>
+<td>The officer overview / SOS / events / tourists routes return the counts the dashboard renders, and the SOS workflow moves OPEN → ACKNOWLEDGED</td>
+<td>counts + ack</td>
+<td>as expected</td>
+<td>PASS</td>
+<td><code>backend/tests/test_authority.py</code> (33) · <code>verify_integration.py</code> ("the SOS appears in the officer's open queue")</td>
+</tr>
+<tr>
+<td>BE-07</td>
+<td>Backend</td>
+<td>Restarting the server leaves the data intact — the SOS, its acknowledgement, the event log <strong>and the future-risk prediction</strong> all survive — and the dashboard page is still served</td>
+<td>persisted</td>
+<td>persisted</td>
+<td>PASS</td>
+<td><code>verify_integration.py</code> (33 checks: outbox delivery, idempotency, SOS acknowledgement, prediction read-back, restart persistence, dashboard fetch)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total enumerated cases: 149 executed (all PASS) + 25 declared NOT EXECUTED (INST-01…INST-25).</strong></p>
+<hr />
+<h2 id="4-supplementary-executed-checks">4. Supplementary executed checks</h2>
+<p>These also ran and passed in the same suites (they are part of the <strong>541 / 179</strong> Android+ML totals, and
+cover the key-less map, the sample-area generator, the offline tile cache, the typed-coordinate editor,
+the movement/fall pipeline, the approach-risk maths, the future-event risk model, the offline position
+queue, self-service registration, the two-role session split and the authority client):</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Coverage</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Key-less map projection</td>
+<td>known slippy-map tile indices, screen↔world round-trips, ground resolution at the equator, latitude clamping, panning directions</td>
+<td><code>MercatorProjectionTest</code> (11 tests)</td>
+</tr>
+<tr>
+<td>Polygon encoding</td>
+<td>ordered/lossless/locale-independent round-trip, malformed tokens skipped, precision preserved</td>
+<td><code>PolygonCodecTest</code> (9 tests)</td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td>durability across close/reopen, pruning, simulated-vs-real isolation, migration contract, and <strong>executing both registered migrations</strong> on a real SQLite database to prove a pre-upgrade row survives</td>
+<td><code>RoomPersistenceTest</code> (12 tests)</td>
+</tr>
+<tr>
+<td>Editing rules</td>
+<td>undo/clear, 3-vertex minimum, duplicate-tap ignored, save validation</td>
+<td><code>GeoFenceEditorViewModelTest</code> (14 tests)</td>
+</tr>
+<tr>
+<td>Simulator</td>
+<td>route builder + controller (real engine, stamped rows)</td>
+<td><code>SimulationPathBuilderTest</code> (11), <code>SimulationControllerTest</code> (8)</td>
+</tr>
+<tr>
+<td>Outbox payloads</td>
+<td>dedupe-key stability, quote escaping, simulated SOS marking, missing-fix tolerance, contacts-as-whole-list-replace, and the <code>POSITION</code> payload incl. <code>null</code> accuracy for a non-finite value</td>
+<td><code>OutboxPayloadsTest</code> (10 tests)</td>
+</tr>
+<tr>
+<td>Offline position sync</td>
+<td>real-GPS-only queueing, simulated/out-of-range rejection, the "no address = no queue" gate, dedupe by fix timestamp, and the interval+distance throttle</td>
+<td><code>PositionReporterTest</code> (6 tests), <code>PositionReportPolicyTest</code> (6 tests)</td>
+</tr>
+<tr>
+<td><strong>Self-registration form</strong></td>
+<td>the local rules a tourist meets: blank/long name, blank phone, non-digit PIN, 4–8 digit bounds, mismatched confirmation, contact trimming/re-numbering/null relationship, half-filled contact rows, the ≤20 contact ceiling, that the confirmation is never carried in the draft that is sent, and — new this round — <strong>which field each problem belongs to</strong> and <strong>exactly what is still outstanding</strong> (so a submit control is never silently dead)</td>
+<td><code>RegistrationFormTest</code> (18 tests)</td>
+</tr>
+<tr>
+<td><strong>Registration request/response</strong></td>
+<td>the request body asks for a tourist and carries the PIN and contacts but <strong>never</strong> a password, a confirmation or a privilege field; an empty contact list is still sent; the minted id parses; a response with no <code>touristId</code> is a protocol error rather than an empty success; a registration over a <strong>real socket</strong> goes out with <strong>no</strong> Authorization header and a 409 duplicate surfaces the server's own message; and (new) the officer register is fetched with the officer's bearer token, parsed end to end, and a tourist token on the same route comes back a 403</td>
+<td><code>AuthorityApiTest</code> (28 tests), <code>AuthorityHttpServerTest</code> (14 tests)</td>
+</tr>
+<tr>
+<td><strong>Registration state machine</strong></td>
+<td>a success stores the minted id for the success screen and signs nobody in; a bad form is refused <strong>before</strong> any request leaves the phone; a 409 reads as "already registered"; an unreachable authority names the address; a blank address is refused; clearing the success screen works; and a later failure does not erase an id the tourist may still be copying</td>
+<td><code>AuthorityViewModelTest</code> (11 tests, Robolectric + in-memory Room)</td>
+</tr>
+<tr>
+<td><strong>Officer console state machine</strong></td>
+<td>officer sign-in stores an officer session and reads the register; it does <strong>not</strong> sign a tourist in; a rejected sign-in stores nothing and says only that the pair was refused; an unreachable authority is named; blank credentials / a blank address are refused before any call; the register request carries the officer bearer token; a 403 drops the session; sign-out revokes the token and clears <strong>only</strong> the officer session; an unsigned-in refresh asks for a sign-in rather than calling the server</td>
+<td><code>OfficerViewModelTest</code> (10 tests, Robolectric)</td>
+</tr>
+<tr>
+<td><strong>Session storage on disk</strong></td>
+<td>a real <code>PreferenceDataStore</code> over a throw-away file, no Robolectric: the address and both sessions survive the store being torn down and rebuilt; a build-time default never overwrites a chosen address and an empty default changes nothing; the tourist and officer sessions are independent, and neither sign-out evicts the other</td>
+<td><code>AuthoritySessionStoreTest</code> (8 tests)</td>
+</tr>
+<tr>
+<td>Sample-area generator</td>
+<td>three valid non-overlapping areas, one per type, near the user; polar longitude scaling</td>
+<td><code>SampleAreasTest</code> (6 tests)</td>
+</tr>
+<tr>
+<td>Tile servers &amp; cache policy</td>
+<td>URL building (incl. <code>{z}/{y}/{x}</code> order), provider fail-over order, index wrapping, provider-scoped cache keys, LRU eviction (under budget, over budget, unsorted input, oversized entry, empty cache), the OpenStreetMap concurrent-request cap, and the explicit refusal to offer CARTO</td>
+<td><code>TilePolicyTest</code> (21 tests)</td>
+</tr>
+<tr>
+<td>Offline tile cache (real files)</td>
+<td>byte-exact round-trip, missing tile is null, count/size reporting, forward-slash names, LRU trim on real files, clear</td>
+<td><code>TileDiskCacheTest</code> (6 tests)</td>
+</tr>
+<tr>
+<td><strong>Android cleartext policy</strong></td>
+<td>the manifest declares <code>android:networkSecurityConfig</code> pointing at a profile whose <code>base-config</code> sets <code>cleartextTrafficPermitted="true"</code>, and the manifest never re-blocks it with <code>usesCleartextTraffic="false"</code> — the setting that decides whether a plain-HTTP LAN authority is reachable from a real phone</td>
+<td><code>NetworkSecurityConfigTest</code> (3 tests)</td>
+</tr>
+<tr>
+<td>Movement / fall pipeline</td>
+<td>window management, the three fall gates, model-absent handling, one-alert-per-fall cooldown, sensor-subscription ownership, session reset</td>
+<td><code>MovementAnalyzerTest</code> (10), <code>MovementControllerTest</code> (7)</td>
+</tr>
+<tr>
+<td>Exported-forest fidelity</td>
+<td>the <strong>shipped Kotlin assets</strong> reproduce scikit-learn's probabilities and argmax on real windows, and both models agree with the extractor on feature order</td>
+<td><code>ForestReferenceTest</code> (3 tests)</td>
+</tr>
+<tr>
+<td>Approach risk</td>
+<td>published weights, history windows, proximity/night/ambulation terms, cap at 100, band boundaries, factor accounting</td>
+<td><code>ApproachRiskTest</code> (10), <code>ZoneHistoryTest</code> (6), <code>ApproachBriefingTest</code> (10)</td>
+</tr>
+<tr>
+<td>Watch delivery indicator</td>
+<td>the sticky-terminal-state ordering rule</td>
+<td><code>SosDeliveryStateTest</code> (4 tests)</td>
+</tr>
+<tr>
+<td>ML plumbing</td>
+<td>malformed/duplicate/invalid-coordinate removal, feature finiteness, model save/load, invalid-input handling</td>
+<td><code>ml/tests/test_pipeline.py</code> (21 tests)</td>
+</tr>
+<tr>
+<td>Shipped-model contract</td>
+<td>tree schema, integer-count regression, scikit-learn agreement, feature-order contract, spec honesty, app-asset byte-equality</td>
+<td><code>ml/tests/test_har_models.py</code> (21 tests)</td>
+</tr>
+<tr>
+<td>OSM EDA parser</td>
+<td>element-type counts, tag-key ranking, feature-class tallies, density maths — on a hand-written Overpass fixture, no network</td>
+<td><code>ml/tests/test_osm_eda.py</code> (12 tests)</td>
+</tr>
+<tr>
+<td>Weather EDA maths</td>
+<td>aggregation and the documented harsh-day threshold — on a fixture, no network</td>
+<td><code>ml/tests/test_weather_eda.py</code> (11 tests)</td>
+</tr>
+<tr>
+<td>Trajectory history</td>
+<td>crossing detection against a polygon, hour/weekday/month bucketing, revisit aggregation — on fixtures</td>
+<td><code>ml/tests/test_history.py</code> (13 tests)</td>
+</tr>
+<tr>
+<td>Transport-mode model</td>
+<td>segment features and the subject-disjoint split rules — on fixtures</td>
+<td><code>ml/tests/test_transport_mode.py</code> (8 tests)</td>
+</tr>
+<tr>
+<td><strong>Future-risk features</strong></td>
+<td>the 22 features index by index (constant/free-fall/hard-landing/oscillation/rotation/cancelling signals), the "no net direction" guard, the short-window and mismatched-channel refusals, and the <code>NAMES</code> order the forest contract depends on</td>
+<td><code>FutureRiskFeaturesTest</code> (13 tests)</td>
+</tr>
+<tr>
+<td><strong>Shipped future-risk asset</strong></td>
+<td>the <strong>shipped</strong> JSON against scikit-learn's own probabilities on <strong>16 real held-out windows</strong>: feature parity, forest parity (worst 5.9e-04, mean &lt; 5e-04 on a step function), Platt calibration parity, and refusal of an artefact whose feature <em>names</em> do not match</td>
+<td><code>FutureRiskReferenceTest</code> (6 tests)</td>
+</tr>
+<tr>
+<td><strong>Future-risk inference</strong></td>
+<td>band mapping at each threshold, calibrated-not-raw probability, insufficient data, implausible (&gt;16 g) and non-finite readings, staleness, paused, factor ordering, non-causal wording, determinism</td>
+<td><code>FutureRiskAnalyzerTest</code> (18 tests)</td>
+</tr>
+<tr>
+<td><strong>Future-risk sharing policy</strong></td>
+<td>first-elevated, escalation (never throttled), the 120 s refresh, one "cleared" record, never UNAVAILABLE/stale, clock-jump robustness</td>
+<td><code>FutureRiskReportPolicyTest</code> (10 tests)</td>
+</tr>
+<tr>
+<td><strong>Future-risk outbox (real SQLite)</strong></td>
+<td>one durable <code>RISK</code> row, the summary-not-stream payload, no row when unconfigured, offline queue + recovery, dedupe</td>
+<td><code>FutureRiskReporterTest</code> (12 tests)</td>
+</tr>
+<tr>
+<td><strong>Future-risk wire contract</strong></td>
+<td>through a real JSON parser: null probability, non-finite handling, escaping, and <strong>no</strong> coordinates or raw samples in the payload</td>
+<td><code>FutureRiskPayloadTest</code> (8 tests)</td>
+</tr>
+<tr>
+<td><strong>One sensor feed, two models</strong></td>
+<td>the movement watch feeds the risk model from the same subscription; no model → "prediction unavailable"; a HIGH forecast raises <strong>no</strong> fall alert; implausible windows refused by both; stop keeps the last forecast</td>
+<td><code>FutureRiskMovementIntegrationTest</code> (8 tests)</td>
+</tr>
+<tr>
+<td><strong>What the card may say</strong></td>
+<td>no band when there is no prediction, <strong>never</strong> "low" for "we do not know", thresholds printed with their provenance, the non-causal caveat, and that the model <strong>never</strong> claims to summon help</td>
+<td><code>FutureRiskCardModelTest</code> (18 tests)</td>
+</tr>
+<tr>
+<td><strong>Future-risk pipeline (Python)</strong></td>
+<td>feature schema/arithmetic, label geometry rebuilt from the raw <code>.mat</code>, leakage, splits, Platt + bands, artefact schema and size budget, app-asset byte-equality, provenance, and the model-selection rule re-derived from <code>tuning.json</code></td>
+<td><code>ml/future_risk/tests/test_future_risk.py</code> (93 tests — see §2)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-not-executed-declared-honestly-no-device-available">5. NOT EXECUTED — declared honestly (no device available)</h2>
+<p>There is <strong>no emulator or AVD</strong> in this environment. The following were <strong>compile-checked only</strong>
+(<code>:app:compileDebugAndroidTestKotlin</code> = BUILD SUCCESSFUL) and have <strong>never been run</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Check</th>
+<th>Status</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>INST-01</td>
+<td><code>DatabaseMigrationTest</code> — opens a real v1 DB, runs <code>MIGRATION_1_2</code>, asserts a saved zone survives and <code>outbox_events</code> is created</td>
+<td>NOT EXECUTED (compiles)</td>
+<td>needs a device/emulator</td>
+</tr>
+<tr>
+<td>INST-02</td>
+<td><code>AppDatabaseInstrumentedTest</code> — on-device persistence smoke test</td>
+<td>NOT EXECUTED (compiles)</td>
+<td>needs a device/emulator</td>
+</tr>
+<tr>
+<td>INST-03</td>
+<td><code>StatusBannerInstrumentedTest</code> — Compose UI banner test</td>
+<td>NOT EXECUTED (compiles)</td>
+<td>needs a device/emulator</td>
+</tr>
+<tr>
+<td>INST-04</td>
+<td>OpenStreetMap tiles actually render on screen</td>
+<td>NOT EXECUTED</td>
+<td>needs a device + network; the projection maths is unit-tested but tile download is not</td>
+</tr>
+<tr>
+<td>INST-05</td>
+<td>Phone vibration / haptic patterns</td>
+<td>NOT EXECUTED</td>
+<td>emulators have no vibrator; needs a physical phone</td>
+</tr>
+<tr>
+<td>INST-06</td>
+<td>Google Maps basemap renders with a real API key</td>
+<td>NOT EXECUTED</td>
+<td>needs a device + a Google Maps API key (none is configured); the branch is compile-checked and the zone/trail overlays are the same code the key-less map uses</td>
+</tr>
+<tr>
+<td>INST-07</td>
+<td>Create Geo-Fence + Tracking maps open <strong>on the user's own area</strong> (live fix → draft vertex → zone → last-known location)</td>
+<td>NOT EXECUTED</td>
+<td>needs a device with location; the centring rules are plain Kotlin but the on-screen result is not observable here</td>
+</tr>
+<tr>
+<td>INST-08</td>
+<td>The "Add 3 sample areas near me" button creates the zones on tap and they appear on the map</td>
+<td>NOT EXECUTED</td>
+<td>needs a device; the geometry it persists <strong>is</strong> unit-tested (<code>SampleAreasTest</code>, MAP-01…MAP-06) but the button wiring is not</td>
+</tr>
+<tr>
+<td>INST-09</td>
+<td>The on-disk tile cache actually serves a map after the app is restarted with no network</td>
+<td>NOT EXECUTED</td>
+<td>needs a device + a first online session; the cache's file behaviour <strong>is</strong> unit-tested (<code>TileDiskCacheTest</code>, MAP-11…MAP-16) but no real tile round-trip was observed</td>
+</tr>
+<tr>
+<td>INST-10</td>
+<td>The "Check map servers" diagnostic and the <strong>provider</strong> fail-over recover a blocked host on a real network</td>
+<td>NOT EXECUTED</td>
+<td>needs a device; the provider order/URLs/keys <strong>are</strong> unit-tested (<code>TilePolicyTest</code>) and all <strong>four</strong> providers answered <code>HTTP 200</code> from the build machine, but device behaviour is not observed</td>
+</tr>
+<tr>
+<td>INST-11</td>
+<td>Zoom in/out buttons change the map zoom</td>
+<td>NOT EXECUTED</td>
+<td>needs a device; trivial UI wiring, no logic of its own</td>
+</tr>
+<tr>
+<td>INST-12</td>
+<td>The <strong>blue</strong> "you are here" marker is actually visible over the tiles, and the hollow grey ring appears when there is no live fix</td>
+<td>NOT EXECUTED</td>
+<td>needs a device. The colour is a theme constant and the marker drawing is compile-checked, but "can a person see it over real tiles" is exactly what cannot be judged from this machine — it is the reported bug</td>
+</tr>
+<tr>
+<td>INST-13</td>
+<td>The crash-report dialog appears after an unexpected close and its Copy button yields the trace</td>
+<td>NOT EXECUTED</td>
+<td>needs a device plus a real crash; the file round-trip is plain file I/O but the dialog and <code>Application</code> wiring are not exercised here</td>
+</tr>
+<tr>
+<td>INST-14</td>
+<td>Sustained panning/pinching does not get the app killed (tile-memory bounding + request de-bouncing)</td>
+<td>NOT EXECUTED</td>
+<td>needs a device; <code>providersToTry</code> <strong>is</strong> unit-tested (MAP-21…MAP-22) but memory behaviour under a real gesture is not observable here</td>
+</tr>
+<tr>
+<td>INST-15</td>
+<td>The watch screen's SOS-delivery note renders the <strong>real</strong> persisted session state (address set or not, signed in or not, last flush outcome)</td>
+<td>NOT EXECUTED</td>
+<td>needs a device; a plain text block driven by the persisted session, compile- and JVM-checked only</td>
+</tr>
+<tr>
+<td>INST-16</td>
+<td>The <code>CameraUpdateFactory is not initialized</code> crash is actually gone — the reported "blue marker appears, then the app closes"</td>
+<td>NOT EXECUTED</td>
+<td>needs a device. The guard plus <code>runCatching</code> around <code>followLatestFix</code>/<code>moveTo</code>/<code>fitPoints</code> is compile- and JVM-verified, but only a device can confirm the <em>reported</em> crash no longer occurs</td>
+</tr>
+<tr>
+<td>INST-17</td>
+<td>Live sensor-driven movement/fall inference runs on hardware (accelerometer + gyroscope → 24 features → shipped forest → gates)</td>
+<td>NOT EXECUTED</td>
+<td>needs a physical device with both sensors. The pipeline is JVM-tested against recorded windows (MOV-01…MOV-18) but no sensor has ever been read by this project</td>
+</tr>
+<tr>
+<td>INST-18</td>
+<td>The movement/fall card and the approach-briefing card render on the Tracking screen (activity + confidence, peak g, impact score, and every risk factor with its points)</td>
+<td>NOT EXECUTED</td>
+<td>needs a device; the state maths behind them is unit-tested (MOV-04…MOV-18, RISK-01…RISK-12) and the Compose code compiles, but the rendered cards were never seen</td>
+</tr>
+<tr>
+<td>INST-19</td>
+<td>The default key-free basemap and the distance-to-boundary pill appear on a real screen</td>
+<td>NOT EXECUTED</td>
+<td>needs a device + network. OpenStreetMap answered <code>HTTP 200</code> from the build machine and the pill is driven by the unit-tested briefing, but the rendered result is not observable here</td>
+</tr>
+<tr>
+<td>INST-20</td>
+<td>The <strong>backend connection (advanced)</strong> screen on a device: entering a base URL, <strong>Test connection</strong> actually reaching <code>/api/v1/health</code> and reporting Connected/Offline, and seeing the real profile / delivery totals / latest SOS render (rather than demo text)</td>
+<td>NOT EXECUTED</td>
+<td>needs a device <strong>and</strong> a reachable server. The client behind it is JVM- and real-socket-tested (AUTH-01…AUTH-14, BE-01…BE-07) and the live test below drives it here, but the Compose screen was never rendered on a device</td>
+</tr>
+<tr>
+<td>INST-21</td>
+<td>The exact network path a device uses — emulator loopback <code>10.0.2.2</code> or a LAN IP over Wi-Fi — delivers an SOS to the authority</td>
+<td>NOT EXECUTED</td>
+<td>needs a device. <code>AuthorityLiveBackendTest</code> proves the <em>client</em> against a real server over a real socket on the JVM (see §7.1); the device's own <code>HttpURLConnection</code> and its loopback/Wi-Fi routing are not exercised here</td>
+</tr>
+<tr>
+<td>INST-22</td>
+<td>The <strong>future-risk card</strong> renders on the Tracking screen (horizon, band, calibrated probability, contributing factors with the non-causal caveat, model version, timestamp, and the "Insufficient data"/"Prediction unavailable" states), and the <strong>authority dashboard's predictions panel</strong> renders the rows it receives</td>
+<td>NOT EXECUTED</td>
+<td>needs a device for the card and a browser for the dashboard. The card's wording is pinned instead by <code>FutureRiskCardModelTest</code> (18 tests) and the inference by <code>FutureRiskReferenceTest</code> (6), both on the JVM; the dashboard's <code>renderRisk</code> path is syntax-checked with <code>node -e</code> but was never opened in a browser</td>
+</tr>
+<tr>
+<td>INST-23</td>
+<td>Live sensor → future-risk inference on hardware (accelerometer → 50-sample window → 22 features → shipped forest → calibrated band)</td>
+<td>NOT EXECUTED</td>
+<td>needs a physical device. <code>FutureRiskMovementIntegrationTest</code> covers the wiring on the JVM against recorded windows, and <code>FutureRiskReferenceTest</code> proves the shipped asset agrees with scikit-learn, but no sensor has ever been read by this project</td>
+</tr>
+<tr>
+<td>INST-24</td>
+<td>The <strong>tourist sign-in + create-account</strong> screen on a device: the sign-in form with its show/hide PIN control, the create-account form (name / phone / PIN / PIN confirmation / add-and-remove optional emergency contacts), the per-field error text, the <em>"still needed"</em> line under a submit button, the registration-success card with its <strong>copy</strong> button and sign-in instructions, and the dashboard's <strong>Registered Tourists</strong> panel rendering the rows the API returns</td>
+<td>NOT EXECUTED</td>
+<td>needs a device <strong>and</strong> a browser reachable to the dashboard. The logic behind the form is JVM-tested (<code>RegistrationFormTest</code> 18, <code>AuthorityViewModelTest</code> 11) and the production client is driven against a real server on the JVM (the live case in §7.1, which registered <code>TR-2026-00001</code> and read the dashboard row back), but no Compose screen was rendered and the panel's <code>renderTourists</code> path is only syntax-checked with <code>node --check</code></td>
+</tr>
+<tr>
+<td>INST-25</td>
+<td>The <strong>role separation as a person experiences it</strong>: the Welcome screen's two choices, a returning tourist being offered <em>Continue</em> and landing on the safety home, <strong>Sign out</strong> returning to the Welcome screen with no <em>Continue</em>, officer sign-in landing on the console, and the console being unreachable from the tourist path</td>
+<td>NOT EXECUTED</td>
+<td>needs a device. The state machine behind it is JVM-tested (<code>OfficerViewModelTest</code> 10, <code>AuthoritySessionStoreTest</code> 8) and the server-side boundary is proven live (a tourist token gets <strong>403</strong> from the officer route, §7.1), but no screen was rendered and the navigation gate was never driven on a device</td>
+</tr>
+</tbody>
+</table>
+<p>The correct way to run these later:</p>
+<pre><code class="language-powershell"># with a phone connected (USB debugging on) or an emulator started
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:connectedDebugAndroidTest&quot;
+</code></pre>
+<hr />
+<h2 id="6-ml-evaluation-results-measurements-not-unit-tests">6. ML evaluation results (measurements, not unit tests)</h2>
+<p>These are produced by the ML scripts on the <strong>real</strong> datasets. They are reported here for
+completeness; they are <strong>not</strong> pass/fail tests.</p>
+<h3 id="61-trajectory-anomaly-geolife-unsupervised">6.1 Trajectory anomaly — GeoLife (unsupervised)</h3>
+<p>Produced by <code>ml/evaluate.py</code> on the <strong>real</strong> GeoLife data (held-out, trajectory-disjoint test split).</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Value</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Held-out test points / trajectories</td>
+<td>369,247 / 300 (0 group overlap with train)</td>
+<td><code>ml/outputs/eval/eval_report.json</code></td>
+</tr>
+<tr>
+<td>Injected teleport points</td>
+<td>17,462</td>
+<td>same</td>
+</tr>
+<tr>
+<td>ROC-AUC (teleport injection)</td>
+<td><strong>0.8922</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Average precision</td>
+<td><strong>0.6763</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Precision@k / Recall@k (k = 17,462)</td>
+<td><strong>0.6165</strong> / <strong>0.6165</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Label-shuffle control ROC-AUC</td>
+<td><strong>0.5007</strong> (≈ chance, sanity check)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Baseline flagging (contamination 0.02)</td>
+<td>threshold 0.5299 → 2.00 % flagged</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>What these mean and do not mean.</strong> A high injection ROC-AUC means the detector separates
+<em>injected GPS teleports</em> from normal movement. It does <strong>not</strong> mean the model detects real danger.
+GeoLife has <strong>no anomaly/danger labels</strong>, so accuracy/F1 against real anomalies <strong>cannot be
+computed</strong> and is deliberately <strong>not</strong> reported. The model output is a <em>movement anomaly score</em>,
+never a danger probability. See <code>docs/model_card.md</code>.</p>
+</blockquote>
+<h3 id="62-movement-recognition-and-impact-detection-uci-har-supervised">6.2 Movement recognition and impact detection — UCI HAR (supervised)</h3>
+<p>Produced by <code>ml/har_train.py</code> and <code>ml/har_fall.py</code>. Unlike §6.1 these <strong>do</strong> have real labels, so
+accuracy, macro-F1 and confusion matrices are computable and are reported. Full method, per-class
+tables, embedded confusion matrices and limitations: <strong><code>docs/model_card_movement.md</code></strong>.</p>
+<p>Activity recognition, 24 time-domain features, evaluated on <strong>2947 held-out windows from 9 subjects
+never seen in training</strong> (subject-disjoint, verified: <code>subject_overlap: []</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th style="text-align: right;">Features</th>
+<th style="text-align: right;">Trees</th>
+<th style="text-align: right;">Accuracy</th>
+<th style="text-align: right;">Macro-F1</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>On-device (shipped)</strong></td>
+<td style="text-align: right;"><strong>24</strong></td>
+<td style="text-align: right;"><strong>32</strong></td>
+<td style="text-align: right;"><strong>0.8351</strong></td>
+<td style="text-align: right;"><strong>0.8333</strong></td>
+<td><code>ml/outputs/har/train/har_train_report.json</code></td>
+</tr>
+<tr>
+<td>561-feature reference</td>
+<td style="text-align: right;">561</td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">0.9287</td>
+<td style="text-align: right;">0.9271</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Single decision tree</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.7967</td>
+<td style="text-align: right;">0.7943</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<p>Per-class, shipped model: WALKING F1 0.7963 · WALKING_UPSTAIRS 0.7277 · WALKING_DOWNSTAIRS 0.8575 ·
+SITTING 0.8020 · STANDING 0.8162 · <strong>LAYING 1.0000</strong>.</p>
+<p>Impact / fall-signature detector, 40 trees, 1848 held-out windows (924 positive):</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th style="text-align: right;">Value</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ROC-AUC</td>
+<td style="text-align: right;"><strong>0.9999</strong></td>
+<td><code>ml/outputs/har/fall/har_fall_report.json</code></td>
+</tr>
+<tr>
+<td>Average precision</td>
+<td style="text-align: right;"><strong>0.9999</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>F1 @ 0.5</td>
+<td style="text-align: right;"><strong>0.9962</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Precision / recall @ 0.5</td>
+<td style="text-align: right;">0.9957 / 0.9968</td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Shuffled-label control ROC-AUC</strong></td>
+<td style="text-align: right;"><strong>0.5198</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Export fidelity (<code>har_verify_export.py</code>)</td>
+<td style="text-align: right;">max probability error <strong>4.97e-07</strong> (activity), <strong>4.74e-07</strong> (fall); <strong>0</strong> argmax mismatches</td>
+<td>console output, reproduced in this run</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>What these mean and do not mean — the same warning as §6.1, and it matters more here.</strong>
+<strong>UCI HAR contains no falls.</strong> The detector's positives are <strong>impacts synthesised into real recorded
+windows</strong>, so these numbers measure detection of <em>that injected signature</em> on real held-out
+subjects — they are <strong>not</strong> a clinical fall-detection result and must not be presented as one. The
+shuffled-label control at 0.5198 is what shows the near-perfect score is the model finding the
+signature rather than exploiting a leak. The named upgrade path is SisFall / UniMiB SHAR / MobiFall,
+which contain genuine falls. The activity model <em>does</em> use real human labels, so its numbers are
+ordinary supervised accuracy.</p>
+<p><strong>The approach-risk score shown when nearing a restricted area is deliberately <em>not</em> here</strong>, because
+it is not a model: it is a published weighted checklist (<code>ApproachRiskModel</code>) with unit-tested
+weights, and no labelled outcome data exists against which it could be fitted or scored.</p>
+</blockquote>
+<h3 id="63-future-risk-prediction-unimib-shar-supervised-real-recorded-falls">6.3 Future risk prediction — UniMiB SHAR (supervised, <strong>real recorded falls</strong>)</h3>
+<p>Produced by <code>ml/future_risk/train.py</code> (hyper-parameters selected by <code>ml/future_risk/tune.py</code>). This is
+the only model here that forecasts an event <strong>before</strong> it happens: <em>given the last second of phone
+accelerometer data, will a hard fall impact land within the next second?</em> Full method, calibration
+tables, per-activity false alarms and the complete limitations list: <strong><code>docs/future_risk_prediction.md</code></strong>.</p>
+<p>Dataset: <strong>UniMiB SHAR</strong> — 30 subjects, 9 activities of daily living + <strong>8 real fall types</strong>, 50 Hz,
+<strong>real recorded falls</strong> (not injected). 1,980 trials read, <strong>1,979 used</strong>; one recording was corrupt and
+is counted (see below). Subject-disjoint 60/20/20 split, seed 42, <strong>18/6/6 subjects, disjoint: true</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th style="text-align: right;">Value</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows (train / validation / test)</td>
+<td style="text-align: right;">31,122 / 9,591 / <strong>10,415</strong></td>
+<td><code>ml/outputs/future_risk/metrics.json</code></td>
+</tr>
+<tr>
+<td>Test subjects / positives</td>
+<td style="text-align: right;">6 (never trained on) / 1,339</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Positive rate (all windows)</td>
+<td style="text-align: right;">0.126310 (6,458 / 51,128)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Majority-class baseline PR-AUC</td>
+<td style="text-align: right;">0.128565 (= the positive rate)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Logistic-regression PR-AUC</td>
+<td style="text-align: right;">0.659633</td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Hist gradient boosting PR-AUC / ROC-AUC</strong></td>
+<td style="text-align: right;"><strong>0.815000 / 0.945913</strong></td>
+<td>same — <strong>not shipped</strong> (cannot run on-device)</td>
+</tr>
+<tr>
+<td><strong>Shipped random forest (calibrated) — precision / recall / F1</strong></td>
+<td style="text-align: right;"><strong>0.6707 / 0.7498 / 0.7080</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Shipped random forest — PR-AUC / ROC-AUC</strong></td>
+<td style="text-align: right;"><strong>0.764569 / 0.936848</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Confusion @ HIGH band (tp / fp / fn / tn)</td>
+<td style="text-align: right;">1,004 / 493 / 335 / 8,583</td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Trial-level sensitivity</strong></td>
+<td style="text-align: right;"><strong>0.929577</strong> (264 of <strong>284</strong> held-out fall trials flagged)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>ADL false alarms / minute (0.2 s stride)</td>
+<td style="text-align: right;"><strong>16.295725</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>ADL false alarms / minute (app cadence 0.64 s)</td>
+<td style="text-align: right;"><strong>5.092414</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Post-impact diagnostic alarm rate</td>
+<td style="text-align: right;">0.074227 (970 windows)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Brier score (raw → calibrated)</td>
+<td style="text-align: right;">0.062600 → <strong>0.056675</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Risk bands (validation-fitted)</td>
+<td style="text-align: right;">HIGH ≥ <strong>0.314046</strong>, MODERATE ≥ <strong>0.069201</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Shuffled-label control ROC-AUC / PR-AUC</strong></td>
+<td style="text-align: right;"><strong>0.477430 / 0.129885</strong> (≈ chance)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Shipped asset size (budget 2,000,000 bytes)</td>
+<td style="text-align: right;"><strong>1,974,297 bytes</strong> / 120 trees / 66,894 nodes</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Model-selection cost of the size budget</td>
+<td style="text-align: right;"><strong>−0.031</strong> validation PR-AUC (0.875909 → 0.845112)</td>
+<td><code>ml/outputs/future_risk/tuning.json</code></td>
+</tr>
+</tbody>
+</table>
+<p>False alarms by activity, so the failure mode is visible rather than averaged away (held-out ADL
+windows):</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Walking</th>
+<th style="text-align: right;">Running</th>
+<th style="text-align: right;">Upstairs</th>
+<th style="text-align: right;">Downstairs</th>
+<th style="text-align: right;"><strong>Jumping</strong></th>
+<th style="text-align: right;"><strong>Sitting down</strong></th>
+<th style="text-align: right;">Stand up (sofa)</th>
+<th style="text-align: right;"><strong>Lying down</strong></th>
+<th style="text-align: right;">Stand up (floor)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0.011076</td>
+<td style="text-align: right;">0.016412</td>
+<td style="text-align: right;">0.025335</td>
+<td style="text-align: right;">0.044248</td>
+<td style="text-align: right;"><strong>0.160615</strong></td>
+<td style="text-align: right;"><strong>0.156385</strong></td>
+<td style="text-align: right;">0.027586</td>
+<td style="text-align: right;"><strong>0.127368</strong></td>
+<td style="text-align: right;">0.031762</td>
+</tr>
+</tbody>
+</table>
+<p>Data quality, reported not hidden: the corrupt recording (subject 10 / <code>Jumping</code> / trial 1, <strong>9,369 of
+9,624</strong> values non-finite) was <strong>dropped and counted</strong>, and <strong>6</strong> fall trials that never reach the 2.0 g
+impact threshold are excluded from the positives (<code>n_fall_trials_without_impact</code>).</p>
+<blockquote>
+<p><strong>What these mean and do not mean.</strong> The labels are <strong>falls in a laboratory</strong>, not tourist incidents,
+and the positives are real fall impacts so no injection caveat applies — but this is still <strong>not a
+deployment-ready fall alarm</strong>: <strong>5.09 false alarms per minute</strong> of ordinary activity, over-confident
+mid-range probabilities, 30 healthy adults carrying a phone, a <strong>one-second</strong> horizon only, and an
+untested "dropped phone vs falling person" failure mode. A HIGH band is an <strong>informational UI state</strong>
+and a queued summary; it raises no alarm and <strong>never</strong> triggers an SOS (<code>backend/tests/test_risk.py</code>
+asserts that a HIGH prediction leaves <code>latestSos</code> empty and <code>state != "SOS"</code>). The shuffled-label
+control at 0.477 is what shows the pipeline leaks nothing.</p>
+</blockquote>
+<hr />
+<h2 id="7-reproduce-everything">7. Reproduce everything</h2>
+<pre><code class="language-powershell">cd D:\TouristSafetyMonitoring-src
+
+# Android JVM suite: 548 tests, 0 failures, 0 errors, 7 skipped (50 classes)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:testDebugUnitTest&quot;
+
+# ...and with the opt-in live tests pointed at a running server (they all run and pass):
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:testDebugUnitTest&quot; `
+    -Dtsm.e2e.baseUrl=http://127.0.0.1:8080 -Dtsm.e2e.credentials=backend\var\DEV_CREDENTIALS.txt
+
+# Instrumented sources compile-check only (nothing runs: no device or emulator here)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:compileDebugAndroidTestKotlin&quot;
+
+# Debug APK -&gt; app\build\outputs\apk\debug\app-debug.apk  (20.33 MB), authority address baked in
+# for this machine's Wi-Fi on first launch:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 &quot;:app:assembleDebug&quot; `
+    -PAUTHORITY_URL=http://192.168.1.102:8080
+
+# Authority backend: in-process rule suite, then the real-subprocess acceptance harness
+python -m pytest backend\tests -q          # 265 pass
+python backend\verify_integration.py       # 41/41 PASS (starts its own server on a free port)
+
+cd ml
+python -m pytest tests -q          # 86 pass (GeoLife/HAR pipeline + OSM, weather, history, transport)
+python -m pytest ../ml/tests ../ml/future_risk/tests -q   # 179 pass (from the repo root)
+python har_verify_export.py        # exported JSON vs scikit-learn: ALL PASS
+python osm_eda.py                  # fetch real OSM (needs network; uses the cache otherwise)
+python weather_eda.py              # real weather (Open-Meteo; OpenWeatherMap if a key is set)
+python history.py                  # historical trajectory + zone-crossing trends
+python transport_mode.py           # supervised transport-mode model (not a risk model)
+python future_risk/train.py        # supervised FUTURE fall-impact model -&gt; outputs + app assets
+python future_risk/tune.py         # the 65-config validation search under the size budget
+powershell -File .\run_all.ps1     # full offline ML pipeline (-Network for the two fetches, -FutureRisk for this model)
+</code></pre>
+<p>APK built by this run: <strong>20.33 MB</strong> (21,317,914 bytes), SHA-256
+<code>F0786379EC1917F9004E03F72E9317FB0C0F97B4B7D4BF9F312A911D3BE5D239</code>, copied to the project root,
+<code>Desktop</code> and <code>Downloads</code> as <code>app-debug.apk</code>. It carries
+<code>BuildConfig.DEFAULT_AUTHORITY_URL = "http://192.168.1.102:8080"</code> (the build machine's Wi-Fi address),
+verified present in the packaged <code>classes8.dex</code> alongside the constant name, and it declares
+<code>android:networkSecurityConfig</code> → <code>res/xml/network_security_config.xml</code>
+(<code>cleartextTrafficPermitted="true"</code>), confirmed by dumping the shipped manifest with <code>aapt2</code>.</p>
+<h3 id="71-the-live-backend-integration-actually-exercised-this-round">7.1 The live backend integration, actually exercised this round</h3>
+<p>Three separate layers were run, in increasing order of realism:</p>
+<ol>
+<li><strong>Backend rules, in-process</strong> — <code>python -m pytest backend\tests -q</code> → <strong>265 passed</strong> (~110 s). A Flask
+   test client, a temporary SQLite file and a frozen clock; no network.</li>
+<li><strong>Backend acceptance, real subprocess on a real socket</strong> — <code>python backend\verify_integration.py</code> →
+   <strong>41/41 PASS</strong>. It starts its own server on a free port, signs in as both roles, <strong>self-registers a
+   tourist from a phone that has no credential and signs in with the id and PIN the service minted</strong>,
+   delivers an outbox batch (a simulated SOS, a zone alert, a position report and an <strong>on-device
+   future-risk summary</strong>), checks idempotency and SOS acknowledgement, reads the prediction back from
+   <code>/authority/risk</code> and the tourist detail and confirms it raised <strong>no</strong> SOS, confirms a duplicate phone
+   is 409 and a <code>role: "authority"</code> registration is 400, <strong>restarts the server to prove persistence</strong>
+   (including the self-registered account), and fetches the dashboard.</li>
+<li><strong>The production Kotlin client against a real server</strong> — <code>AuthorityLiveBackendTest</code>, run with
+   <code>-Dtsm.e2e.baseUrl=http://127.0.0.1:8080</code> and <code>-Dtsm.e2e.credentials=backend\var\DEV_CREDENTIALS.txt</code>
+   against the <code>python backend\run.py</code> started for this pass. Result: <strong>7/7 passed, <code>skipped="0"</code></strong> (the
+   same seven that skip in a normal run):</li>
+</ol>
+<ul>
+<li><em>"a self-registered tourist appears on the authority dashboard and then reports a position"</em> — the
+     production client registered a brand-new tourist over a real socket (unauthenticated — the request
+     carried <strong>no</strong> bearer token), received <code>TR-2026-00001</code>, signed in with that id and the PIN it chose,
+     and the officer's authenticated <code>GET /authority/tourists</code> showed it exactly once with
+     <code>registrationSource="SELF"</code>, <code>registrationStatus="REGISTERED"</code>, <code>hasPosition=false</code>,
+     <code>latestPosition=null</code> and <code>trackingStatus="AWAITING_FIRST_REPORT"</code> — <em>registration and tracking are
+     separate facts</em>. After the phone delivered a real-GPS <code>POSITION</code> report the same row became
+     <code>trackingStatus="OK"</code>, <code>hasPosition=true</code>, <code>state="OK"</code> with
+     <code>latestPosition:{18.5204,73.8567,simulated:false}</code>.</li>
+<li><em>"an SOS raised on the phone reaches the authority, persists, and is never duplicated"</em> — the
+     client signed in as <code>T-1001</code> (43-char token), flushed the outbox (<code>SyncReport(inspected=1,
+     delivered=1, retried=0, rejected=0)</code>), received a server event id, and re-delivering the same batch
+     was reported <code>DELIVERED</code> with <strong>one</strong> row in the officer queue for our event. <code>/me</code> returned
+     <code>latestSos=OPEN simulated=true</code>. (The absolute counts depend on which tests ran first, so they are
+     read back and compared rather than asserted as fixed numbers.)</li>
+<li><em>"a routine position report reaches the authority's map"</em> — a real-GPS <code>POSITION</code> event was queued
+     and delivered, and <code>GET /me</code> reported <code>latestPosition: 18.5204,73.8567 simulated=false</code>.</li>
+<li><em>"a tourist can set a PIN and then sign in with it instead of the password"</em> — password sign-in,
+     <code>PUT /me/pin</code>, then a PIN sign-in that returned <code>subjectId=T-1001</code>; a wrong PIN returned HTTP 401.</li>
+<li><em>"a dead backend leaves the SOS queued and reports why"</em> — pointed at a closed port, the event
+     stayed queued with reason <em>"The authority at 127.0.0.1:1 is unreachable: Connection refused:
+     getsockopt"</em>.</li>
+<li><em>"an on-device future-risk summary reaches the authority and is never an incident"</em> — a <code>RISK</code>
+     summary built by the production <code>OutboxPayloads.futureRisk(…)</code> was queued and delivered
+     (<code>SyncReport(inspected=1, delivered=1, retried=0, rejected=0)</code>); <code>GET /api/v1/authority/risk</code>
+     returned exactly <strong>one</strong> row for that prediction instant, labelled <code>kind="PREDICTION"</code> with
+     <code>modelVersion="future-risk-unimib-v1"</code>, <code>horizonSeconds=1.0</code>, <code>probability=0.62</code> and both
+     contributing factors; the overview counted <code>riskAssessments=1</code> and <code>riskElevated=1</code> <strong>while
+     <code>sosTotal</code> stayed unchanged</strong> — the run logged
+     <code>[e2e] overview counts after a HIGH forecast: {…,"riskAssessments":1,"riskElevated":1,"sosTotal":1,…}</code>.
+     A forecast is not an incident.</li>
+<li><em>"the officer console reads the register and a tourist token is refused it"</em> (new this round) — the
+     production client signed in as an <strong>officer</strong>, read <code>GET /api/v1/authority/tourists</code> through the very
+     method the in-app console calls (<strong>every</strong> returned row asserted to carry an id, a registration status
+     and a tracking status, and to have a position only when it says it has one), and then presented a
+     <strong>tourist's</strong> token to the same route and received <strong>HTTP 403</strong>. Role separation is a server fact, not
+     a hidden screen.</li>
+</ul>
+<p>These are recorded in full in <code>app/build/test-results/testDebugUnitTest/TEST-…AuthorityLiveBackendTest.xml</code>
+   (<code>skipped="0"</code> when run with a base URL).</p>
+<blockquote>
+<p><strong>What is still NOT executed on this layer:</strong> the same flow from an <strong>Android device</strong> (INST-20,
+INST-21, INST-25). The Kotlin client, its HTTP stack on the JVM, and the server were both real; the
+device's own <code>HttpURLConnection</code>, its loopback <code>10.0.2.2</code> routing, and the Compose screens were not.
+In particular the new <strong>Welcome / role chooser</strong>, the <strong>tourist sign-in + create-account</strong> form with its
+success card and copy button, and the <strong>in-app officer console</strong> were compile-checked, unit-tested at the
+ViewModel and client level, and exercised through the production client on the JVM, but never rendered on
+a screen — no emulator or device is available here.</p>
+</blockquote></body></html>
