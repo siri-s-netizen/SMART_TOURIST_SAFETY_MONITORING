@@ -63,7 +63,7 @@ class RoomPersistenceTest {
 
     @Test
     fun `the schema is versioned and the migration path is non-destructive`() {
-        assertEquals(3, AppDatabase.VERSION)
+        assertEquals(5, AppDatabase.VERSION)
         assertTrue(
             "adding the offline outbox and the contact list must not lose the tourist's zones",
             DatabaseMigrations.ALL.isNotEmpty(),
@@ -121,9 +121,183 @@ class RoomPersistenceTest {
         }
     }
 
+    /**
+     * The one thing the ownership upgrade must *not* do is decide for itself which tourist a queued
+     * event belonged to: it does not know, and guessing would have the authority file the event
+     * against the wrong person. So the column is added as `NULL` — meaning *unassigned* — and the rows
+     * themselves are left exactly as they were.
+     *
+     * This runs the real [DatabaseMigrations.MIGRATION_3_4] against a real SQLite database, so it
+     * exercises the actual `ALTER TABLE` rather than a description of it.
+     */
+    @Test
+    fun `the ownership upgrade adds the owner column and leaves queued events unassigned`() {
+        val db = openInMemorySqlite()
+        try {
+            // The v3 outbox, as it exists on a device that queued an SOS before this build.
+            db.execSQL(
+                "CREATE TABLE `outbox_events` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`dedupe_key` TEXT NOT NULL, " +
+                    "`kind` TEXT NOT NULL, " +
+                    "`payload` TEXT NOT NULL, " +
+                    "`created_at` INTEGER NOT NULL, " +
+                    "`attempt_count` INTEGER NOT NULL DEFAULT 0, " +
+                    "`last_attempt_at` INTEGER, " +
+                    "`status` TEXT NOT NULL, " +
+                    "`origin` TEXT NOT NULL, " +
+                    "`last_error` TEXT)",
+            )
+            db.execSQL(
+                "INSERT INTO `outbox_events` " +
+                    "(`dedupe_key`,`kind`,`payload`,`created_at`,`status`,`origin`,`attempt_count`) " +
+                    "VALUES ('sos:queued-before-the-upgrade','SOS','{}',7,'PENDING','GPS',1)",
+            )
+
+            DatabaseMigrations.MIGRATION_3_4.migrate(db)
+
+            db.query(
+                "SELECT `dedupe_key`, `status`, `attempt_count`, `owner_subject_id` FROM `outbox_events`",
+            ).use { cursor ->
+                assertTrue("the queued event must survive the upgrade", cursor.moveToFirst())
+                assertEquals("sos:queued-before-the-upgrade", cursor.getString(0))
+                assertEquals("it must still be waiting to upload", "PENDING", cursor.getString(1))
+                assertEquals("its retry history must be intact", 1, cursor.getInt(2))
+                assertTrue(
+                    "an event queued before ownership existed must stay unassigned, not be adopted",
+                    cursor.isNull(3),
+                )
+                assertEquals("the upgrade must not invent or drop rows", 1, cursor.count)
+            }
+
+            db.query("PRAGMA table_info(`outbox_events`)").use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                val notNullColumn = cursor.getColumnIndexOrThrow("notnull")
+                val defaultColumn = cursor.getColumnIndexOrThrow("dflt_value")
+                var found = false
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(nameColumn) != "owner_subject_id") continue
+                    found = true
+                    assertEquals(
+                        "unassigned is the absence of an owner",
+                        0,
+                        cursor.getInt(notNullColumn),
+                    )
+                    assertTrue(
+                        "no default: a default would silently adopt every old row",
+                        cursor.isNull(defaultColumn),
+                    )
+                }
+                assertTrue("the upgrade must add owner_subject_id", found)
+            }
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
+     * The zone-provenance upgrade must not re-label a zone the tourist drew.
+     *
+     * Three columns are added to `geo_fences`, and each of the three has a "correct" value that is
+     * *not* the app's guess: `source` is `LOCAL`, because a row that existed before this build was a
+     * zone drawn on this phone, and the two authority columns are `NULL`, because this phone has never
+     * downloaded anything. Marking such a row `AUTHORITY` would authorise the sync to overwrite or
+     * delete it; giving it a sentinel id like `-1` would be a real value a comparison could match.
+     *
+     * This runs the real [DatabaseMigrations.MIGRATION_4_5] against a real SQLite database, and then
+     * checks the column metadata as well as the data, so a "fix" that adds the columns with the wrong
+     * nullability or the wrong default fails here.
+     */
+    @Test
+    fun `the zone provenance upgrade keeps drawn zones local and downloads nothing`() {
+        val db = openInMemorySqlite()
+        try {
+            // The v4 `geo_fences`, as it exists on a device that drew a zone before this build.
+            db.execSQL(
+                "CREATE TABLE `geo_fences` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`description` TEXT NOT NULL, " +
+                    "`zone_type` TEXT NOT NULL, " +
+                    "`vertices` TEXT NOT NULL, " +
+                    "`vertex_count` INTEGER NOT NULL, " +
+                    "`enabled` INTEGER NOT NULL DEFAULT 1, " +
+                    "`created_at` INTEGER NOT NULL, " +
+                    "`updated_at` INTEGER NOT NULL)",
+            )
+            db.execSQL(
+                "INSERT INTO `geo_fences` " +
+                    "(`name`,`description`,`zone_type`,`vertices`,`vertex_count`,`enabled`," +
+                    "`created_at`,`updated_at`) " +
+                    "VALUES ('Drawn by hand','','RESTRICTED','12.9,77.5;12.9,77.6;13.0,77.6',3,1,11,22)",
+            )
+
+            DatabaseMigrations.MIGRATION_4_5.migrate(db)
+
+            db.query(
+                "SELECT `name`, `vertices`, `enabled`, `source`, `authority_zone_id`, " +
+                    "`authority_revision` FROM `geo_fences`",
+            ).use { cursor ->
+                assertTrue("the drawn zone must survive the upgrade", cursor.moveToFirst())
+                assertEquals("Drawn by hand", cursor.getString(0))
+                assertEquals(
+                    "its geometry must be untouched",
+                    "12.9,77.5;12.9,77.6;13.0,77.6",
+                    cursor.getString(1),
+                )
+                assertEquals("it must still be enabled", 1, cursor.getInt(2))
+                assertEquals(
+                    "a zone that existed before shared zones is a local zone",
+                    "LOCAL",
+                    cursor.getString(3),
+                )
+                assertTrue(
+                    "the upgrade must not invent a zone id",
+                    cursor.isNull(4),
+                )
+                assertTrue(
+                    "the upgrade must not invent a revision",
+                    cursor.isNull(5),
+                )
+                assertEquals("the upgrade must not invent or drop rows", 1, cursor.count)
+            }
+
+            val columns = mutableMapOf<String, Pair<Int, String?>>()
+            db.query("PRAGMA table_info(`geo_fences`)").use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                val notNullColumn = cursor.getColumnIndexOrThrow("notnull")
+                val defaultColumn = cursor.getColumnIndexOrThrow("dflt_value")
+                while (cursor.moveToNext()) {
+                    columns[cursor.getString(nameColumn)] = cursor.getInt(notNullColumn) to
+                        if (cursor.isNull(defaultColumn)) null else cursor.getString(defaultColumn)
+                }
+            }
+
+            val source = columns["source"]
+            assertNotNull("the source column must exist", source)
+            assertEquals("source is never null", 1, source!!.first)
+            assertEquals(
+                "and defaults to LOCAL, which is not a guess: the row was local",
+                "'LOCAL'",
+                source.second,
+            )
+
+            val authorityId = columns["authority_zone_id"]
+            assertNotNull("the authority id column must exist", authorityId)
+            assertEquals("an authority id may be absent", 0, authorityId!!.first)
+            assertNull("no sentinel default for the authority id", authorityId.second)
+
+            val revision = columns["authority_revision"]
+            assertNotNull("the revision column must exist", revision)
+            assertEquals("a revision may be absent", 0, revision!!.first)
+            assertNull("no sentinel default for the revision", revision.second)
+        } finally {
+            db.close()
+        }
+    }
+
     /** A bare in-memory SQLite database, so a migration can be executed without Room in the way. */
-    private fun openInMemorySqlite(): SupportSQLiteDatabase {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+    private fun openInMemorySqlite(): SupportSQLiteDatabase {        val context = ApplicationProvider.getApplicationContext<Context>()
         val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
             .name(null)
             .callback(

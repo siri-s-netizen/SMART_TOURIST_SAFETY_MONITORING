@@ -6,7 +6,6 @@ import com.touristsafety.app.authority.AuthorityHttpRequest
 import com.touristsafety.app.authority.AuthorityHttpResponse
 import com.touristsafety.app.authority.AuthoritySession
 import com.touristsafety.app.data.database.AppDatabase
-import com.touristsafety.app.data.repository.OutboxRepository
 import com.touristsafety.app.domain.model.EmergencyContact
 import com.touristsafety.app.domain.model.OutboxEvent
 import com.touristsafety.app.outbox.DeliveryResult
@@ -16,6 +15,7 @@ import com.touristsafety.app.testing.FakeAuthorityHttp
 import com.touristsafety.app.testing.InMemoryAuthoritySessionStore
 import com.touristsafety.app.testing.MainDispatcherRule
 import com.touristsafety.app.testing.inMemoryDatabase
+import com.touristsafety.app.testing.ownedOutbox
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -58,7 +58,7 @@ class AuthorityViewModelTest {
     ): Pair<AuthorityViewModel, InMemoryAuthoritySessionStore> {
         val store = InMemoryAuthoritySessionStore(AuthoritySession(baseUrl = baseUrl))
         val client = AuthorityClient(baseUrl = { store.current().baseUrl }, http = http)
-        val repository = OutboxRepository(database.outboxEventDao())
+        val repository = ownedOutbox(database.outboxEventDao())
         val syncer = OutboxSyncer(
             repository = repository,
             transport = object : SyncTransport {

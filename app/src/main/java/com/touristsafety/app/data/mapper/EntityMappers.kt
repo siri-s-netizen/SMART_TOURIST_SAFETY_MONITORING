@@ -10,6 +10,7 @@ import com.touristsafety.app.domain.model.GeoFenceZone
 import com.touristsafety.app.domain.model.GeoPoint
 import com.touristsafety.app.domain.model.GeoReading
 import com.touristsafety.app.domain.model.LocationSource
+import com.touristsafety.app.domain.model.ZoneSource
 import com.touristsafety.app.domain.model.ZoneType
 
 /**
@@ -28,6 +29,9 @@ fun GeoFenceEntity.toDomain(): GeoFenceZone = GeoFenceZone(
     enabled = enabled,
     createdAtMillis = createdAt,
     updatedAtMillis = updatedAt,
+    source = ZoneSource.fromStorage(source),
+    authorityZoneId = authorityZoneId,
+    authorityRevision = authorityRevision,
 )
 
 fun GeoFenceZone.toEntity(): GeoFenceEntity = GeoFenceEntity(
@@ -40,6 +44,9 @@ fun GeoFenceZone.toEntity(): GeoFenceEntity = GeoFenceEntity(
     enabled = enabled,
     createdAt = createdAtMillis,
     updatedAt = updatedAtMillis,
+    source = source.storageKey,
+    authorityZoneId = authorityZoneId,
+    authorityRevision = authorityRevision,
 )
 
 fun LocationRecordEntity.toDomain(): GeoReading = GeoReading(

@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.touristsafety.app.AppContainer
 import com.touristsafety.app.domain.model.GeoFenceZone
+import com.touristsafety.app.domain.model.ZoneSource
 import com.touristsafety.app.domain.model.ZoneType
 import com.touristsafety.app.ui.components.ActionButtonRow
 import com.touristsafety.app.ui.components.CardSpacer
@@ -81,11 +82,12 @@ fun ManageZonesScreen(
     if (confirmingDeleteAll) {
         AlertDialog(
             onDismissRequest = { confirmingDeleteAll = false },
-            title = { Text("Delete every zone?") },
+            title = { Text("Delete every zone you drew?") },
             text = {
                 Text(
-                    "All saved geo-fences will be removed. Recorded alert history is kept, " +
-                        "because it is an audit trail of where you have been.",
+                    "Your saved geo-fences will be removed. Recorded alert history is kept, because " +
+                        "it is an audit trail of where you have been. Zones published by the authority " +
+                        "are kept — they are managed there, and would return on the next refresh.",
                 )
             },
             confirmButton = {
@@ -159,8 +161,10 @@ fun ManageZonesScreen(
         item {
             ActionButtonRow {
                 Button(onClick = onCreateZone) { Text("New zone") }
-                if (summary.total > 0) {
-                    OutlinedButton(onClick = { confirmingDeleteAll = true }) { Text("Delete all") }
+                // Only offered when there is something of the tourist's own to delete. The authority's
+                // zones are not the tourist's to remove, and would return on the next refresh.
+                if (allZones.any { it.source == ZoneSource.LOCAL }) {
+                    OutlinedButton(onClick = { confirmingDeleteAll = true }) { Text("Delete my zones") }
                 }
             }
             CardSpacer()
@@ -240,6 +244,11 @@ private fun ZoneRow(
     onDelete: () -> Unit,
 ) {
     val visuals = zoneVisualsFor(zone.type)
+    // A zone the authority published is a *mirror*: the sync will replace it on the next fetch and
+    // remove it as soon as the authority stops publishing it. Edit and delete would therefore be
+    // buttons that silently undo themselves — worse than no button, because the user would believe
+    // they had done something. The row says who owns it instead.
+    val fromAuthority = zone.isFromAuthority
 
     InfoCard {
         Row(
@@ -258,16 +267,27 @@ private fun ZoneRow(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (fromAuthority) {
+                    CardSpacer()
+                    Text(
+                        text = "Published by the authority",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit ${zone.name}")
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = "Delete ${zone.name}",
-                    tint = MaterialTheme.colorScheme.error,
-                )
+            if (!fromAuthority) {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit ${zone.name}")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Delete ${zone.name}",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
 
@@ -286,7 +306,11 @@ private fun ZoneRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (zone.enabled) "Monitored" else "Paused — no alerts",
+                    text = when {
+                        fromAuthority -> "Monitored — published to every phone"
+                        zone.enabled -> "Monitored"
+                        else -> "Paused — no alerts"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                 )
@@ -296,7 +320,18 @@ private fun ZoneRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Switch(checked = zone.enabled, onCheckedChange = { onToggle() })
+            if (!fromAuthority) {
+                Switch(checked = zone.enabled, onCheckedChange = { onToggle() })
+            }
+        }
+
+        if (fromAuthority) {
+            Text(
+                text = "This boundary is managed by the authority, so it cannot be edited or paused " +
+                    "on this phone. It stops being monitored only when the authority withdraws it.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

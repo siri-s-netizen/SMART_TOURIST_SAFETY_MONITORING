@@ -25,7 +25,11 @@ class OutboxSyncer(
 ) {
 
     suspend fun flush(limit: Int = OutboxRepository.DEFAULT_BATCH): SyncReport {
-        val batch = repository.pending(limit)
+        // Only the signed-in tourist's own rows. Anything else (another account's event, or a row
+        // whose owner predates ownership tracking) is deferred, not sent: the authority files an
+        // upload against the token that carried it, so sending a stranger's event here would file it
+        // under the wrong person.
+        val batch = repository.pendingForDelivery(limit)
         var delivered = 0
         var retried = 0
         var rejected = 0

@@ -1,7 +1,16 @@
 """Start the authority backend.
 
-    python backend/run.py                       # http://127.0.0.1:8080
-    python backend/run.py --host 0.0.0.0        # reachable from a phone on the same Wi-Fi
+    python backend/run.py                       # http://0.0.0.0:8080, reachable from a phone
+    python backend/run.py --host 127.0.0.1      # this computer only
+
+The default bind address is ``0.0.0.0`` on purpose. This service exists so that *phones* on the same
+Wi-Fi can reach it, and a server bound to loopback cannot be reached by any of them: the phone gets a
+connection timeout and the sign-in screen can only say "not answering", which is indistinguishable
+from a wrong address, a stopped server, or a firewall. Binding the LAN interface by default removes
+that whole class of dead end. It prints the address to type into the app on start-up.
+
+Bind to loopback explicitly (``--host 127.0.0.1``) when working on this computer alone, or when the
+Wi-Fi network is not trusted, since ``0.0.0.0`` exposes this port to everyone on the network.
 
 On the first start two accounts are created and their generated passwords are printed **once**.
 See README.md in this directory for the full walkthrough.
@@ -34,7 +43,12 @@ def local_ipv4() -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Tourist Safety authority backend")
-    parser.add_argument("--host", default="127.0.0.1", help="bind address (0.0.0.0 for a phone)")
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="bind address; 0.0.0.0 (default) is reachable from a phone on the same Wi-Fi, "
+        "127.0.0.1 is this computer only",
+    )
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--database", default=None, help="override the SQLite file path")
     parser.add_argument("--quiet", action="store_true", help="suppress the start-up banner")
@@ -52,11 +66,17 @@ def main() -> int:
         print("=" * 72)
         print(f"  Tourist Safety authority backend {VERSION}")
         print(f"  Database : {app.config['DATABASE_PATH']}")
+        print(f"  Bind     : {args.host}:{args.port}")
         print(f"  Dashboard: http://127.0.0.1:{args.port}/")
-        if lan:
-            print(f"  Dashboard (LAN)  : http://{lan}:{args.port}/")
-            print(f"  Android base URL : http://{lan}:{args.port}/")
-        print("  Phone on an emulator uses http://10.0.2.2:%d/ as the base URL." % args.port)
+        if lan and args.host != "127.0.0.1":
+            print("-" * 72)
+            print(f"  Type this into the Android app (Settings -> Authority backend):")
+            print(f"      {lan}:{args.port}")
+            print(f"  Phone on an emulator uses 10.0.2.2:{args.port} instead of {lan}.")
+        elif args.host == "127.0.0.1":
+            print("-" * 72)
+            print("  Bound to loopback: only this computer can reach it. Re-run without --host to")
+            print("  let a phone on the same Wi-Fi connect.")
         print("-" * 72)
 
         if report["credentials"]:

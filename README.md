@@ -20,7 +20,7 @@ configured address the app simply keeps events in its durable outbox and says so
 
 | Screen | Purpose |
 | --- | --- |
-| **Welcome (role chooser)** | The first screen. Two plain choices: **I'm a tourist** and **I'm an authority officer**. A returning tourist with a valid session is offered one-tap *Continue* above the choices. |
+| **Welcome (role chooser)** | The first screen, **on every launch**. Two plain choices: **I'm a tourist** and **I'm an authority officer**. Nothing is chosen automatically: a stored session and a previous route never decide the role for the person now holding the phone, and tourist tracking, tourist registration and the officer console are never opened on top of this screen. A returning tourist with a valid session is *offered* one-tap *Continue* above the choices. **Backend settings** sits below the choices, so the authority address is fixable before anyone signs in. |
 | **Tourist sign-in / Create account** | One screen for both. **Sign in** with a Tourist ID and a **PIN or password** (with a show/hide control), or **create an account** (name, phone, a PIN you choose and confirm, and optional emergency contacts). The service allocates your Tourist ID, e.g. `TR-2026-00124`, shown on the success screen with a **copy** button and sign-in instructions. Every missing or wrong field is named in words; no button is ever silently greyed out. |
 | **Authority officer console** | Officer sign-in (id + password, verified server-side) and then the **register of accounts**: Tourist ID, name, registration date and source, tracking status, last known position with its timestamp, open SOS count, contacts on file and the latest risk band. Officer logins are refused for tourist tokens by the *server* (403). |
 | **Home / Safety Dashboard** | The single safety indicator (green / amber / red), live counters, the newest crossings, a real **GPS status** card (waiting / acquiring / live / poor accuracy / permission denied / unavailable, with fix age and accuracy), a **your account** card (Tourist ID, name, alerts waiting to send, links to contacts / settings / sign out), and an in-app banner for the latest event. |
@@ -31,7 +31,8 @@ configured address the app simply keeps events in its durable outbox and says so
 | **Settings & Permissions** | Runtime-permission status, tracking interval, accuracy priority, background tracking, notification toggle, the geo-fence tolerances, and **authority position reporting** (on/off + interval). |
 | **Simulation Mode** | Development-only: walks a synthetic route through a test polygon. Clearly labelled and completely isolated from real GPS. |
 | **Simulated Smartwatch** | A key-less software watch (SAFE / WARNING / SOS) driven by the same real GPS pipeline, with zone-entry haptics, an SOS button, and honest offline delivery status. Reached from the watch icon in the top app bar. |
-| **Authority backend (advanced)** | An operator/developer screen: the service address, a real **Test connection** that actually calls `/api/v1/health` (so *Connected* is never claimed just because a field was saved), the durable delivery queue with an *upload now* button, the current tourist session and a PIN change, and exactly what the authority holds for this phone (delivery totals, latest SOS and whether it was acknowledged, the position on file). Reached from **Settings → Backend connection (advanced)**. |
+| **Backend settings** | The address of the authority this phone reports to, with **Save address** and a real **Test connection** that actually calls `/api/v1/health` (so *Connected* is never claimed just because a field was saved). Reachable **before signing in** — from the Welcome screen, from tourist sign-in and from officer sign-in — because an address that stopped answering has to be changeable without a sign-in that needs a reachable authority. One address is shared by tourist sign-in, officer sign-in, the upload queue, SOS delivery and zone sync. |
+| **Authority backend (advanced)** | An operator/developer screen: the same address card, the durable delivery queue with an *upload now* button, the current tourist session and a PIN change, and exactly what the authority holds for this phone (delivery totals, latest SOS and whether it was acknowledged, the position on file). Reached from **Settings → Backend connection (advanced)**. |
 | **Emergency Contacts** | The list of people to contact in an emergency, stored durably and uploaded to the authority through the same offline queue. Reached from Home or Settings. |
 
 Bottom navigation holds the five everyday destinations (Home, Tracking, Create, Zones, Alerts).
@@ -39,9 +40,10 @@ The app opens on the **Welcome** screen and asks who is holding the phone; the t
 sign-in / account creation and then the safety home, the officer path leads to officer sign-in and the
 register of accounts. Neither path shows the other's screens, and the officer routes are refused to a
 tourist token by the server. Settings and the Simulated Smartwatch are reached from the top app bar;
-the authority-address screen is deliberately **not** in the tourist's normal path — it lives in
-Settings → *Backend connection (advanced)*. Emergency Contacts is reached from Home or Settings;
-Simulation is reached from Settings and only unlocks once simulation mode is switched on.
+the authority address is deliberately **not** part of the tourist's journey, but it is always
+reachable — **Backend settings** from the Welcome screen, tourist sign-in and officer sign-in, and
+*Settings → Backend connection (advanced)* once signed in. Emergency Contacts is reached from Home or
+Settings; Simulation is reached from Settings and only unlocks once simulation mode is switched on.
 
 ---
 
@@ -389,11 +391,13 @@ On first start it generates a tourist and an authority account and a **tourist s
 **The app no longer asks a tourist for the address.** A debug build can bake one in at build time
 (`-PAUTHORITY_URL=http://192.168.1.102:8080`, or `TSM_AUTHORITY_URL`, or `AUTHORITY_URL=` in
 `local.properties`); it is written to the session store on first launch and *never* overwrites an
-address the user has already chosen. The APK attached to this pass is built with
-`http://192.168.1.102:8080`, so it works out of the box on the same Wi-Fi as this machine. If the
-address needs changing, it lives in **Settings → Backend connection (advanced)** (emulator:
-`10.0.2.2:8080`; physical phone: the LAN address `run.py` prints), where **Test connection** performs a
-real `GET /api/v1/health` — the screen says *Connected* only when something actually answered.
+address the user has already chosen. If it needs changing — and it will, every time the laptop joins a
+different network — open **Backend settings** from the Welcome screen (or from tourist sign-in, or
+from officer sign-in; *Settings → Backend connection (advanced)* has the same card once you are in),
+type the address (emulator: `10.0.2.2:8080`; physical phone: the LAN address `run.py` prints), press
+**Save address**, then **Test connection**. The test dials the address **in the field**, not the one
+already saved, and performs a real `GET /api/v1/health` — the screen says *Connected* only when
+something actually answered at that address.
 
 Then, on the phone: choose **I'm a tourist** → **Create an account**, fill in a name, phone number, a
 PIN and confirm it (emergency contacts are optional), and the service allocates a Tourist ID such as
@@ -775,9 +779,11 @@ Everything in §8.1 runs on the JVM with Robolectric.
     that the provider caption reads **"OpenStreetMap ▸"**. Tap the caption →
     *Check map servers*: all three providers should report ok.
 27. **Authority backend:** start it with `python backend\run.py`, open <http://127.0.0.1:8080/> and confirm
-    the dashboard loads. On the phone, open **Settings → Backend connection (advanced)**, enter
-    `10.0.2.2:8080` (emulator) or the printed LAN address (physical phone), press **Test connection** and
-    confirm it says **Connected** (and that an address with no server behind it says **Offline** instead).
+    the dashboard loads. On the phone, open **Backend settings** — from the Welcome screen, before any
+    sign-in — enter `10.0.2.2:8080` (emulator) or the printed LAN address (physical phone), press
+    **Save address**, then **Test connection** and confirm it says **Connected** (and that an address
+    with no server behind it says **Offline** instead). The test dials what is in the field, so with an
+    unsaved address the message also tells you to save it.
     Sign a tourist in with the id and password from `backend/var/DEV_CREDENTIALS.txt`, switch the toggle to
     **PIN**, press **Set or change PIN**, and sign in again with the id + PIN — a wrong PIN must be refused.
 28. **SOS delivery:** press **SIMULATED SOS** in the watch and confirm the phone reports it delivered, the

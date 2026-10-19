@@ -12,8 +12,10 @@ import com.touristsafety.app.outbox.DeliveryResult
 import com.touristsafety.app.outbox.FakeSyncTransport
 import com.touristsafety.app.outbox.OutboxSyncer
 import com.touristsafety.app.outbox.SyncTransport
+import com.touristsafety.app.testing.TEST_TOURIST_ID
 import com.touristsafety.app.testing.awaitUntil
 import com.touristsafety.app.testing.inMemoryDatabase
+import com.touristsafety.app.testing.ownedOutbox
 import com.touristsafety.app.testing.privateExecutor
 import com.touristsafety.app.tracking.TrackingSnapshot
 import kotlinx.coroutines.CoroutineScope
@@ -61,7 +63,7 @@ class WatchControllerTest {
         ioExecutor = privateExecutor("watch-room-io")
         scopeDispatcher = privateExecutor("watch-scope").asCoroutineDispatcher()
         database = inMemoryDatabase(ioExecutor)
-        repository = OutboxRepository(database.outboxEventDao())
+        repository = ownedOutbox(database.outboxEventDao())
         haptics = RecordingHaptics()
         scope = CoroutineScope(SupervisorJob() + scopeDispatcher)
     }
@@ -134,6 +136,11 @@ class WatchControllerTest {
         val pending = repository.pending()
         assertEquals(1, pending.size)
         assertEquals(OutboxKind.SOS, pending.single().kind)
+        assertEquals(
+            "the SOS must record whose emergency it is, or a later sign-in could claim it",
+            TEST_TOURIST_ID,
+            pending.single().ownerSubjectId,
+        )
         assertEquals(SosDeliveryState.QUEUED, controller.state.value.sosDelivery)
 
         watcher.cancel()

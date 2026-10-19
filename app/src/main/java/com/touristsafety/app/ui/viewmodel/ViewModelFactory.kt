@@ -15,6 +15,7 @@ import com.touristsafety.app.AppContainer
 class AppViewModelFactory(
     private val container: AppContainer,
     private val editorZoneId: Long? = null,
+    private val authorityZoneId: Int? = null,
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -22,6 +23,7 @@ class AppViewModelFactory(
         val viewModel: ViewModel = when {
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> HomeViewModel(
                 trackingController = container.trackingController,
+                backgroundControl = container.backgroundTrackingControl,
                 geoFenceRepository = container.geoFenceRepository,
                 alertRepository = container.alertRepository,
                 locationRepository = container.locationRepository,
@@ -29,6 +31,7 @@ class AppViewModelFactory(
                 authoritySessionStore = container.authoritySessionStore,
                 authorityClient = container.authorityClient,
                 outboxRepository = container.outboxRepository,
+                stopMovementWatch = container::stopMovementWatchIfStarted,
             )
 
             modelClass.isAssignableFrom(TrackingViewModel::class.java) -> TrackingViewModel(
@@ -87,6 +90,25 @@ class AppViewModelFactory(
                 client = container.authorityClient,
                 deviceId = container.deviceLabel,
             )
+
+            modelClass.isAssignableFrom(AuthorityConsoleViewModel::class.java) ->
+                AuthorityConsoleViewModel(
+                    sessions = container.authoritySessionStore,
+                    client = container.authorityClient,
+                )
+
+            modelClass.isAssignableFrom(AuthorityZonesViewModel::class.java) ->
+                AuthorityZonesViewModel(
+                    sessions = container.authoritySessionStore,
+                    client = container.authorityClient,
+                )
+
+            modelClass.isAssignableFrom(AuthorityZoneEditorViewModel::class.java) ->
+                AuthorityZoneEditorViewModel(
+                    sessions = container.authoritySessionStore,
+                    client = container.authorityClient,
+                    editingZoneId = authorityZoneId,
+                )
 
             modelClass.isAssignableFrom(EmergencyContactsViewModel::class.java) ->
                 EmergencyContactsViewModel(

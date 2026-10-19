@@ -50,7 +50,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun emergencyContactDao(): EmergencyContactDao
 
     companion object {
-        const val VERSION: Int = 3
+        /**
+         * Schema version. Version 5 added the zone-provenance columns to `geo_fences`; the migration
+         * in [DatabaseMigrations.MIGRATION_4_5] is additive, so an upgrade keeps every row.
+         */
+        const val VERSION: Int = 5
         const val DATABASE_NAME: String = "tourist_safety.db"
 
         @Volatile

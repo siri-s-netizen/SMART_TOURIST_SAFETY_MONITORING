@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.touristsafety.app.data.database.AppDatabase
 import com.touristsafety.app.data.database.DatabaseMigrations
+import com.touristsafety.app.data.database.dao.OutboxEventDao
+import com.touristsafety.app.data.repository.OutboxRepository
 
 /** An in-memory [AppDatabase] for the Robolectric-backed tests. Closed by the caller. */
 fun inMemoryDatabase(): AppDatabase {
@@ -46,6 +48,26 @@ fun privateExecutor(name: String, threads: Int = 2): java.util.concurrent.Execut
     java.util.concurrent.Executors.newFixedThreadPool(threads) { runnable ->
         Thread(runnable, name).apply { isDaemon = true }
     }
+
+/**
+ * A stand-in for the authority's **stable subject id**.
+ *
+ * The real value is the one the authority mints at sign-in and writes into `sessions.subject_id`
+ * (`backend/tsm/api.py`). Tests that are not about ownership still have to name an owner, because an
+ * outbox row is never delivered without one.
+ */
+const val TEST_TOURIST_ID: String = "T-1001"
+
+/**
+ * An outbox queue owned by one tourist.
+ *
+ * [owner] is a function rather than a value so a test can move the queue between tourists mid-scenario
+ * — exactly what signing a different account in on the same handset does.
+ */
+fun ownedOutbox(
+    dao: OutboxEventDao,
+    owner: () -> String? = { TEST_TOURIST_ID },
+): OutboxRepository = OutboxRepository(dao, currentOwner = owner)
 
 /**
  * A file-backed [AppDatabase], so a test can close it, reopen it and prove that saved zones and alert

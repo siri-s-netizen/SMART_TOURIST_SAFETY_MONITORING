@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -64,6 +65,29 @@ interface AuthoritySessionStore {
 private val Context.authoritySessionDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "authority_session",
 )
+
+/**
+ * Performs a session-store write that a button on screen asked for, turning a failure into a sentence.
+ *
+ * Returns `null` when the write succeeded, or a description of what went wrong.
+ *
+ * This exists rather than a bare `sessions.setBaseUrl(...)` because a store write **can throw** — a
+ * full disk, an unwritable file — and an exception thrown inside `viewModelScope.launch` is caught by
+ * nobody: it reaches Android's default handler and closes the app. Closing the app because a settings
+ * value could not be written is never the right answer, and neither is pretending the write worked, so
+ * the caller is handed a sentence to show while the store keeps whatever it already held.
+ *
+ * Cancellation is not a failure — the screen went away — so it is rethrown.
+ */
+internal suspend fun sessionWrite(what: String, write: suspend () -> Unit): String? =
+    try {
+        write()
+        null
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (problem: Exception) {
+        "$what (${problem.javaClass.simpleName}" + (problem.message?.let { ": $it" } ?: "") + ")"
+    }
 
 /**
  * The production session store, over the process-wide preferences DataStore.

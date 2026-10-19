@@ -21,6 +21,7 @@ fun OutboxEventEntity.toDomain(): OutboxEvent = OutboxEvent(
     status = OutboxStatus.fromStorage(status),
     origin = OutboxOrigin.fromStorage(origin),
     lastError = lastError,
+    ownerSubjectId = ownerSubjectId,
 )
 
 fun OutboxEvent.toEntity(): OutboxEventEntity = OutboxEventEntity(
@@ -34,4 +35,5 @@ fun OutboxEvent.toEntity(): OutboxEventEntity = OutboxEventEntity(
     status = status.storageKey,
     origin = origin.storageKey,
     lastError = lastError,
+    ownerSubjectId = ownerSubjectId,
 )

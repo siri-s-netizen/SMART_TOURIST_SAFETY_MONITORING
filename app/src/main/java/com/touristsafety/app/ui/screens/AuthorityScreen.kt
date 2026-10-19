@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.touristsafety.app.AppContainer
-import com.touristsafety.app.authority.AuthorityConnectionState
 import com.touristsafety.app.domain.model.GeoPoint
 import com.touristsafety.app.ui.components.ActionButtonRow
 import com.touristsafety.app.ui.components.CardSpacer
@@ -92,39 +91,17 @@ fun AuthorityScreen(
 
         item { SectionHeader("Authority backend") }
         item {
-            InfoCard(title = "Address") {
-                Text(
-                    text = "The computer running the authority service. On a home network that is " +
-                        "usually 192.168.x.x:8080; an emulator reaches the host at 10.0.2.2:8080.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                CardSpacer()
-                LabelValueRow(label = "Connection", value = connectionLabel(connection))
-                CardSpacer()
-                OutlinedTextField(
-                    value = address,
-                    onValueChange = { address = it },
-                    label = { Text("Base URL") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                CardSpacer()
-                ActionButtonRow {
-                    OutlinedButton(
-                        onClick = { viewModel.setAddress(address) },
-                        enabled = !busy,
-                    ) {
-                        Text("Save address")
-                    }
-                    OutlinedButton(
-                        onClick = { viewModel.testConnection() },
-                        enabled = !busy,
-                    ) {
-                        Text("Test connection")
-                    }
-                }
-            }
+            // The same card the pre-sign-in Backend settings screen shows: one editor, one wording,
+            // one place where a typed address is tested, so the two screens cannot disagree.
+            BackendAddressCard(
+                address = address,
+                onAddressChange = { address = it },
+                storedAddress = session.baseUrl,
+                connection = connection,
+                busy = busy,
+                onSave = { viewModel.setAddress(address) },
+                onTestConnection = { viewModel.testConnection(address) },
+            )
             CardSpacer()
         }
 
@@ -286,13 +263,4 @@ fun AuthorityScreen(
 
         item { Box(Modifier.height(24.dp)) }
     }
-}
-
-private fun connectionLabel(state: AuthorityConnectionState): String = when (state) {
-    AuthorityConnectionState.CONNECTED -> "Connected"
-    AuthorityConnectionState.CHECKING -> "Checking…"
-    AuthorityConnectionState.OFFLINE -> "Offline"
-    AuthorityConnectionState.ERROR -> "Connection failed"
-    AuthorityConnectionState.NOT_CONFIGURED -> "Not configured"
-    AuthorityConnectionState.UNKNOWN -> "Not checked"
 }

@@ -48,6 +48,7 @@ fun WelcomeScreen(
     onResume: () -> Unit,
     onTourist: () -> Unit,
     onOfficer: () -> Unit,
+    onOpenBackendSettings: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -129,6 +130,21 @@ fun WelcomeScreen(
             text = "Tourists and officers are separate accounts. A tourist account can never open " +
                 "the officer console, and the authority checks every request again on the server — " +
                 "not only on this screen.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        // Reachable before any sign-in, on purpose: the address has to be fixable on a phone that is
+        // already pointing at an authority that is no longer there, and signing in needs that address.
+        OutlinedButton(onClick = onOpenBackendSettings, modifier = Modifier.fillMaxWidth()) {
+            Text("Backend settings")
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Which authority this phone reports to. Change it when the laptop's address " +
+                "changes, before you sign in.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

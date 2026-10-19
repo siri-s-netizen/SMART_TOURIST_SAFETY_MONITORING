@@ -315,6 +315,150 @@ object AuthorityApi {
     fun zoneStatusBody(status: String): String =
         Json.write(Json.obj("status" to Json.str(status)))
 
+    /** The body for `POST /authority/sos/<id>/ack`. Only `note` is optional. */
+    fun sosAckBody(note: String?): String {
+        val trimmed = note?.trim()?.takeIf { it.isNotEmpty() }
+        return Json.write(Json.obj("note" to Json.str(trimmed)))
+    }
+
+    // ---------------------------------------------------------------- authority console
+
+    /**
+     * `GET /authority/overview`.
+     *
+     * The counts are read field by field with a zero default rather than "all or nothing": a server
+     * that adds a counter must not blank the whole dashboard, but a counter it did not send must read
+     * as zero rather than as an invented number.
+     */
+    fun parseOverview(text: String): AuthorityOverview {
+        val root = Json.parse(text)
+        val counts = root.objectOrNull("counts")
+        return AuthorityOverview(
+            counts = AuthorityOverviewCounts(
+                tourists = counts?.int("tourists") ?: 0,
+                events = counts?.int("events") ?: 0,
+                eventsLast24h = counts?.int("eventsLast24h") ?: 0,
+                sosTotal = counts?.int("sosTotal") ?: 0,
+                sosOpen = counts?.int("sosOpen") ?: 0,
+                sosAcknowledged = counts?.int("sosAcknowledged") ?: 0,
+                zoneAlerts = counts?.int("zoneAlerts") ?: 0,
+                emergencyContacts = counts?.int("emergencyContacts") ?: 0,
+                riskAssessments = counts?.int("riskAssessments") ?: 0,
+                riskElevated = counts?.int("riskElevated") ?: 0,
+                touristsWithElevatedRiskLast24h = counts?.int("touristsWithElevatedRiskLast24h") ?: 0,
+            ),
+            tourists = root.array("tourists").mapNotNull { it.toOverviewTouristOrNull() },
+            serverTimeMillis = root.long("serverTimeMillis") ?: 0L,
+        )
+    }
+
+    private fun JsonValue.toOverviewTouristOrNull(): AuthorityOverviewTourist? {
+        val touristId = string("touristId")?.takeIf { it.isNotBlank() } ?: return null
+        return AuthorityOverviewTourist(
+            touristId = touristId,
+            displayName = string("displayName") ?: touristId,
+            latitude = double("latitude"),
+            longitude = double("longitude"),
+            accuracyMeters = double("accuracyMeters"),
+            positionRecordedAtMillis = long("positionRecordedAtMillis"),
+            lastSeenMillis = long("lastSeenMillis"),
+            lastEventAtMillis = long("lastEventAtMillis"),
+            openSosCount = int("openSosCount") ?: 0,
+            emergencyContactCount = int("emergencyContactCount") ?: 0,
+            simulated = boolean("simulated") ?: false,
+            state = string("state") ?: "OK",
+            latestRiskBand = string("latestRiskBand"),
+            latestRiskProbability = double("latestRiskProbability"),
+            latestRiskAtMillis = long("latestRiskAtMillis"),
+        )
+    }
+
+    /**
+     * `GET /authority/sos`.
+     *
+     * A row without an id is dropped: an incident the officer cannot acknowledge is not an incident
+     * the app should list as if it could be acted on.
+     */
+    fun parseSos(text: String): List<AuthoritySosRow> =
+        Json.parse(text).array("sos").mapNotNull { it.toSosOrNull() }
+
+    /** The single incident `POST /authority/sos/<id>/ack` answers with. */
+    fun parseSosOne(text: String): AuthoritySosRow? =
+        Json.parse(text).objectOrNull("sos")?.toSosOrNull()
+
+    private fun JsonValue.toSosOrNull(): AuthoritySosRow? {
+        val sosId = long("sosId") ?: return null
+        return AuthoritySosRow(
+            sosId = sosId,
+            serverEventId = string("serverEventId"),
+            touristId = string("touristId") ?: "",
+            displayName = string("displayName") ?: string("touristId") ?: "",
+            latitude = double("latitude"),
+            longitude = double("longitude"),
+            accuracyMeters = double("accuracyMeters"),
+            raisedAtMillis = long("raisedAtMillis") ?: 0L,
+            receivedAtMillis = long("receivedAtMillis") ?: 0L,
+            status = string("status") ?: "OPEN",
+            simulated = boolean("simulated") ?: false,
+            acknowledgedAtMillis = long("acknowledgedAtMillis"),
+            acknowledgedBy = string("acknowledgedBy"),
+            note = string("note"),
+        )
+    }
+
+    /**
+     * `GET /authority/risk`.
+     *
+     * Kept strictly apart from [parseSos]: a forecast is not an incident, and nothing here is ever
+     * turned into an [AuthoritySosRow]. An unrecognised band is preserved verbatim rather than mapped
+     * onto "low" — the app does not get to downgrade a forecast it does not understand.
+     */
+    fun parseRisk(text: String): List<AuthorityRiskRow> =
+        Json.parse(text).array("risk").mapNotNull { it.toRiskOrNull() }
+
+    private fun JsonValue.toRiskOrNull(): AuthorityRiskRow? {
+        val touristId = string("touristId")?.takeIf { it.isNotBlank() } ?: return null
+        val band = string("riskBand")?.takeIf { it.isNotBlank() } ?: return null
+        return AuthorityRiskRow(
+            touristId = touristId,
+            riskBand = band,
+            probability = double("probability"),
+            horizonSeconds = double("horizonSeconds") ?: 0.0,
+            modelVersion = string("modelVersion") ?: "",
+            observedSamples = int("observedSamples") ?: 0,
+            windowSamples = int("windowSamples") ?: 0,
+            dataOk = boolean("dataOk") ?: false,
+            dataReason = string("dataReason"),
+            factors = array("factors").mapNotNull { factor ->
+                val label = factor.string("label") ?: return@mapNotNull null
+                AuthorityRiskFactor(label = label, detail = factor.string("detail"))
+            },
+            assessedAtMillis = long("assessedAtMillis") ?: 0L,
+            receivedAtMillis = long("receivedAtMillis") ?: 0L,
+            disclaimer = string("disclaimer"),
+        )
+    }
+
+    /** `GET /authority/events`. A row without a kind is dropped — it cannot be labelled honestly. */
+    fun parseEvents(text: String): List<AuthorityEventRow> =
+        Json.parse(text).array("events").mapNotNull { entry ->
+            val kind = entry.string("kind")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            AuthorityEventRow(
+                serverEventId = entry.string("serverEventId"),
+                touristId = entry.string("touristId") ?: "",
+                kind = kind,
+                origin = entry.string("origin"),
+                simulated = entry.boolean("simulated") ?: false,
+                latitude = entry.double("latitude"),
+                longitude = entry.double("longitude"),
+                zoneName = entry.string("zoneName"),
+                zoneType = entry.string("zoneType"),
+                eventType = entry.string("eventType"),
+                deviceTimestampMillis = entry.long("deviceTimestampMillis"),
+                receivedAtMillis = entry.long("receivedAtMillis") ?: 0L,
+            )
+        }
+
     private fun JsonValue.toContactOrNull(): EmergencyContact? {
         val name = string("name") ?: return null
         val phone = string("phone") ?: return null

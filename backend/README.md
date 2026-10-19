@@ -76,9 +76,18 @@ launch: build with `-PAUTHORITY_URL=http://192.168.1.20:8080` (or set `TSM_AUTHO
 `AUTHORITY_URL=…` in `local.properties`). It is written to the session store **once** and never overwrites
 an address that has already been chosen.
 
-To change it on the phone, open **Settings → Backend connection (advanced)** — the address deliberately
-does not sit in the tourist's normal path. Press **Test connection** to confirm it: that performs a real
-`GET /api/v1/health` and reports *Connected* only when something answered, *Offline* otherwise.
+To change it on the phone, open **Backend settings**. It is reachable **before signing in** (from the
+Welcome screen, tourist sign-in and officer sign-in) as well as from *Settings → Backend connection
+(advanced)* afterwards. That matters on a laptop that moves between networks: the address has to be
+correctable on a phone whose saved address no longer answers, and signing in requires a reachable
+server. One address serves tourist sign-in, officer sign-in, the upload queue, SOS delivery and zone
+sync.
+
+**Save address** stores the address (only an address it can dial is accepted — a typo is refused with a
+sentence, not a socket error). **Test connection** dials the address **in the field**, which may not be
+saved yet, and performs a real `GET /api/v1/health`, reporting *Connected* only when something answered
+at that address, *Offline* otherwise. If the address you tested is not the one in use, the message says
+so and asks you to save it.
 
 | Where the phone is | Address to enter |
 | --- | --- |

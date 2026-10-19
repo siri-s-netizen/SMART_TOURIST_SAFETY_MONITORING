@@ -15,6 +15,7 @@ import com.touristsafety.app.location.LocationSource
 import com.touristsafety.app.notifications.AlertNotifier
 import com.touristsafety.app.settings.AppSettings
 import com.touristsafety.app.settings.SettingsRepository
+import com.touristsafety.app.tracking.BackgroundTrackingControl
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -127,6 +128,17 @@ class InMemoryAuthoritySessionStore(
     private val state = MutableStateFlow(initial)
 
     /**
+     * Set to make every **write** fail the way an unwritable preference file does: a full disk, a file
+     * that cannot be replaced. Reads keep answering, so a test can show that a save which cannot be
+     * written is reported to the operator instead of closing the app.
+     */
+    var writeFailure: Exception? = null
+
+    private fun failWrite() {
+        writeFailure?.let { throw it }
+    }
+
+    /**
      * The officer's own session, kept separate exactly as the production store keeps it under separate
      * keys — so a test can prove a tourist sign-out does not evict an officer, and vice versa.
      */
@@ -141,11 +153,13 @@ class InMemoryAuthoritySessionStore(
     override suspend fun currentOfficer(): OfficerSession = officerState.value
 
     override suspend fun setBaseUrl(baseUrl: String) {
+        failWrite()
         state.value = state.value.copy(baseUrl = AuthorityUrls.normalise(baseUrl))
         officerState.value = officerState.value.copy(baseUrl = AuthorityUrls.normalise(baseUrl))
     }
 
     override suspend fun saveLogin(baseUrl: String, login: AuthorityLoginResult) {
+        failWrite()
         state.value = AuthoritySession(
             baseUrl = AuthorityUrls.normalise(baseUrl),
             token = login.token,
@@ -158,6 +172,7 @@ class InMemoryAuthoritySessionStore(
     }
 
     override suspend fun clearLogin() {
+        failWrite()
         state.value = state.value.copy(
             token = null,
             role = null,
@@ -169,6 +184,7 @@ class InMemoryAuthoritySessionStore(
     }
 
     override suspend fun saveOfficerLogin(baseUrl: String, login: AuthorityLoginResult) {
+        failWrite()
         officerState.value = OfficerSession(
             baseUrl = AuthorityUrls.normalise(baseUrl),
             token = login.token,
@@ -179,10 +195,12 @@ class InMemoryAuthoritySessionStore(
     }
 
     override suspend fun clearOfficerLogin() {
+        failWrite()
         officerState.value = OfficerSession(baseUrl = officerState.value.baseUrl)
     }
 
     override suspend fun seedBaseUrlIfUnset(defaultUrl: String): Boolean {
+        failWrite()
         val normalised = AuthorityUrls.normalise(defaultUrl)
         if (normalised.isEmpty()) return false
         if (state.value.baseUrl.isNotBlank()) return false
@@ -192,6 +210,7 @@ class InMemoryAuthoritySessionStore(
     }
 
     override suspend fun clear() {
+        failWrite()
         state.value = AuthoritySession()
         officerState.value = OfficerSession()
     }
@@ -214,6 +233,14 @@ class FakeAuthorityHttp(
     /** Set to make every call fail the way a lost connection does. */
     var failure: java.io.IOException? = null
 
+    /**
+     * Set to make every call throw something that is **not** an `IOException` — a `SecurityException`
+     * from a missing permission, an `IllegalStateException` from a URL with no host, or a
+     * `ClassCastException` from a non-HTTP scheme. The platform can throw these out of a socket call,
+     * and the client is required to report them rather than let them reach the screen as a crash.
+     */
+    var unexpectedFailure: RuntimeException? = null
+
     val requests: List<AuthorityHttpRequest> get() = synchronized(recorded) { recorded.toList() }
 
     fun respondWith(responder: (AuthorityHttpRequest) -> AuthorityHttpResponse) {
@@ -222,7 +249,32 @@ class FakeAuthorityHttp(
 
     override suspend fun execute(request: AuthorityHttpRequest): AuthorityHttpResponse {
         synchronized(recorded) { recorded += request }
+        unexpectedFailure?.let { throw it }
         failure?.let { throw it }
         return responder(request)
+    }
+}
+
+/**
+ * Records what the foreground-service control was asked to do.
+ *
+ * A no-op fake so a ViewModel can be tested without touching `Context` — the same reasoning as
+ * [BackgroundTrackingControl]'s own existence. [startCalls] matters for the sign-out test: signing out
+ * must never *start* a service in order to stop one.
+ */
+class FakeBackgroundTrackingControl : BackgroundTrackingControl {
+
+    var startCalls: Int = 0
+        private set
+
+    var stopCalls: Int = 0
+        private set
+
+    override fun start() {
+        startCalls += 1
+    }
+
+    override fun stop() {
+        stopCalls += 1
     }
 }

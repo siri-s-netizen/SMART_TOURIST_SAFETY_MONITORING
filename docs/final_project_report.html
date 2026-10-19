@@ -303,6 +303,14 @@ modified.</p>
 <h2 id="7-deliverable-5-ml-exploratory-data-analysis-pipeline-ml">7. Deliverable 5 — ML / exploratory-data-analysis pipeline (<code>ml/</code>)</h2>
 <p>Self-contained under <code>ml/</code>; <strong>supplements — never replaces</strong> the deterministic geo-fencing in <code>app/</code>
 and does not touch <code>app/</code>.</p>
+<blockquote>
+<p><strong>Consolidated data, model and evaluation evidence → <a href="data_and_ml_analysis.md"><code>docs/data_and_ml_analysis.md</code></a></strong>
+(with <code>.html</code> and <code>.pdf</code> beside it). Every dataset, EDA finding, qualitative example, metric,
+training methodology, leakage check and the full evidence appendix, in one place. §7.14 below
+carries the headline results table.</p>
+<p><strong>Prefer plain English? → <a href="data_ml_explained_simply.md"><code>docs/data_ml_explained_simply.md</code></a></strong> — the
+same findings and the same numbers, written for a reader who is not a data scientist.</p>
+</blockquote>
 <h3 id="71-dataset-real-verified">7.1 Dataset (real, verified)</h3>
 <p>Microsoft Research <strong>GeoLife GPS Trajectories 1.3</strong> — the official archive was <strong>downloaded and
 unzipped here</strong> (313,164,406 bytes, 298.7 MB). Measured scale: <strong>182 user directories, 18,670
@@ -791,6 +799,124 @@ so its seven cases skip in this run; their last measured result is §7.12's <str
 <p><strong>Not verified:</strong> that the banner actually clears on the phone — that needs the new APK installed on a real
 device (INST-24/25). What is proven is that the artefact now contains the policy Android requires, and that
 the setting cannot silently regress without a failing test.</p>
+<hr />
+<h3 id="714-consolidated-data-model-and-evaluation-evidence">7.14 Consolidated data, model and evaluation evidence</h3>
+<p>The complete data-science record — dataset documentation, EDA, qualitative and quantitative analysis,
+per-model training methodology, the separation of the four risk concepts, the consolidated results
+table and the evidence appendix — is in <strong><code>docs/data_and_ml_analysis.md</code></strong> (<code>.html</code>/<code>.pdf</code> beside it).
+It was written strictly from the saved artefacts in <code>ml/outputs/</code>, <code>ml/models/</code> and
+<code>app/src/main/assets/</code>: every number is read back out of the file that produced it, and metrics or studies
+that do not exist are stated plainly as missing rather than filled in (the complete inventory of
+unavailable results is kept in <code>docs/data_and_ml_analysis_full.md</code>).</p>
+<p>Headline numbers — all held-out, all traceable to a named file:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Dataset</th>
+<th>Split</th>
+<th style="text-align: right;">Accuracy</th>
+<th style="text-align: right;">Precision</th>
+<th style="text-align: right;">Recall</th>
+<th style="text-align: right;">F1</th>
+<th style="text-align: right;">ROC-AUC</th>
+<th style="text-align: right;">PR-AUC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trajectory anomaly (unsupervised)</td>
+<td>GeoLife 1.3</td>
+<td>trajectory-disjoint</td>
+<td style="text-align: right;">NOT AVAILABLE</td>
+<td style="text-align: right;">0.6165 (P@k)</td>
+<td style="text-align: right;">0.6165 (R@k)</td>
+<td style="text-align: right;">N/A</td>
+<td style="text-align: right;">0.8922 (injection)</td>
+<td style="text-align: right;">0.6763</td>
+</tr>
+<tr>
+<td>Activity recognition — on-device (shipped)</td>
+<td>UCI HAR</td>
+<td>subject-disjoint</td>
+<td style="text-align: right;">0.8351</td>
+<td style="text-align: right;">0.8405 (macro)</td>
+<td style="text-align: right;">0.8307 (macro)</td>
+<td style="text-align: right;">0.8333</td>
+<td style="text-align: right;">NOT AVAILABLE</td>
+<td style="text-align: right;">NOT AVAILABLE</td>
+</tr>
+<tr>
+<td>Activity recognition — 561-feature reference</td>
+<td>UCI HAR</td>
+<td>subject-disjoint</td>
+<td style="text-align: right;">0.9287</td>
+<td style="text-align: right;">0.9301</td>
+<td style="text-align: right;">0.9258</td>
+<td style="text-align: right;">0.9271</td>
+<td style="text-align: right;">NOT AVAILABLE</td>
+<td style="text-align: right;">NOT AVAILABLE</td>
+</tr>
+<tr>
+<td>Impact detector (shipped, <strong>synthetic positives</strong>)</td>
+<td>UCI HAR + injected</td>
+<td>subject-disjoint</td>
+<td style="text-align: right;">0.9962</td>
+<td style="text-align: right;">0.9957</td>
+<td style="text-align: right;">0.9968</td>
+<td style="text-align: right;">0.9962</td>
+<td style="text-align: right;">0.9999</td>
+<td style="text-align: right;">0.9999</td>
+</tr>
+<tr>
+<td>Future-risk, calibrated @ HIGH (shipped)</td>
+<td>UniMiB SHAR</td>
+<td>subject-disjoint</td>
+<td style="text-align: right;">0.9205</td>
+<td style="text-align: right;">0.6707</td>
+<td style="text-align: right;">0.7498</td>
+<td style="text-align: right;">0.7080</td>
+<td style="text-align: right;">0.9368</td>
+<td style="text-align: right;">0.7646</td>
+</tr>
+<tr>
+<td>Hist gradient boosting (better, <strong>not shippable</strong>)</td>
+<td>UniMiB SHAR</td>
+<td>subject-disjoint</td>
+<td style="text-align: right;">NOT AVAILABLE</td>
+<td style="text-align: right;">0.7916</td>
+<td style="text-align: right;">0.6721</td>
+<td style="text-align: right;">0.7270</td>
+<td style="text-align: right;">0.9459</td>
+<td style="text-align: right;">0.8150</td>
+</tr>
+<tr>
+<td>Transport mode (<strong>not a risk model</strong>)</td>
+<td>GeoLife <code>labels.txt</code></td>
+<td>subject-disjoint</td>
+<td style="text-align: right;">0.8475</td>
+<td style="text-align: right;">0.5922 (macro)</td>
+<td style="text-align: right;">0.5775 (macro)</td>
+<td style="text-align: right;">0.5784 (macro)</td>
+<td style="text-align: right;">NOT AVAILABLE</td>
+<td style="text-align: right;">NOT AVAILABLE</td>
+</tr>
+</tbody>
+</table>
+<p>Three points the consolidated document makes that this report must not lose:</p>
+<ol>
+<li><strong>The future-risk model is the only one trained on real falls</strong> — and it still forecasts one second
+   ahead, with <strong>5.09 false alarms per minute</strong> of ordinary activity at the app's cadence, worst on
+   jumping, sitting down and lying down. Trial-level sensitivity is 0.9296 (264/284), which is the
+   honest headline; window recall is 0.7498.</li>
+<li><strong>The geofence is a configured rule and the approach score is a published weighted checklist.</strong>
+   Neither is a trained model and neither has a probability. The four risk concepts are separated
+   structurally in the code and pinned by tests (§7.8, §7.9, §7.10).</li>
+<li><strong>Datasets used, all verified on disk:</strong> GeoLife 1.3 (18,670 <code>.plt</code>, 24,876,978 rows), UCI HAR
+   (7,352 / 2,947 windows), UniMiB SHAR (1,979 trials, archive SHA-256 recorded), OpenStreetMap
+   (Overpass, ODbL) and Open-Meteo (<strong>not</strong> OpenWeatherMap). Public and laboratory data <strong>do not
+   validate real tourist safety</strong>, and no user study was conducted (<code>NOT CONDUCTED</code>).</li>
+</ol>
 <hr />
 <h2 id="8-deliverables-13-14-the-authority-backend-and-the-real-transport">8. Deliverables 13 &amp; 14 — the authority backend and the real transport</h2>
 <p>This is the round this report's date was revised for: the app can now actually deliver events, and there

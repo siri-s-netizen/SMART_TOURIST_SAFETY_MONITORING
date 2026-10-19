@@ -1,0 +1,1320 @@
+<!doctype html><html><head><meta charset='utf-8'><title>data_and_ml_analysis</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#1a1a1a;}
+h1{font-size:1.8rem;border-bottom:2px solid #2e7d32;padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:#1b5e20;margin-top:1.8rem;border-bottom:1px solid #ddd;padding-bottom:.2rem;}
+h3{font-size:1.1rem;color:#4a148c;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #bbb;padding:.4rem .55rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.8rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1rem 0;padding:.4rem 1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.6rem 0;background:#fff;}
+@media print{body{margin:0;max-width:none;} h2{page-break-after:avoid;} table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="data-models-and-evaluation-ml-consolidated-report">Data, models and evaluation (<code>ml/</code>) — consolidated report</h1>
+<p><em>Generated 2026-10-19. Everything in this report was built in this project. Every number was written
+by a script that ran and was read back out of the file it produced — none is estimated.</em></p>
+<p><strong>Full per-model detail:</strong> <a href="dataset_and_eda.md"><code>docs/dataset_and_eda.md</code></a> ·
+<a href="model_card.md"><code>docs/model_card.md</code></a> ·
+<a href="model_card_movement.md"><code>docs/model_card_movement.md</code></a> ·
+<a href="future_risk_prediction.md"><code>docs/future_risk_prediction.md</code></a> ·
+<a href="test_report.md"><code>docs/test_report.md</code></a>
+<strong>Plain English:</strong> <a href="data_ml_explained_simply.md"><code>docs/data_ml_explained_simply.md</code></a></p>
+<hr />
+<h2 id="1-what-was-built">1. What was built</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Trained?</th>
+<th>Method</th>
+<th>Artifact</th>
+<th>Runs where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Trajectory anomaly detector</strong></td>
+<td>Unsupervised</td>
+<td><code>IsolationForest</code>, 200 trees, 14 features</td>
+<td><code>ml/models/isolation_forest.joblib</code> (1,753.5 KB)</td>
+<td><code>ml/</code> analysis</td>
+</tr>
+<tr>
+<td><strong>Activity recognition</strong></td>
+<td>Yes</td>
+<td><code>RandomForest</code>, 32 trees, depth 8, 24 features</td>
+<td><code>app/src/main/assets/har_activity_model.json</code> (268,734 B)</td>
+<td><strong>On the phone</strong></td>
+</tr>
+<tr>
+<td><strong>Impact (fall-signature) detector</strong></td>
+<td>Yes</td>
+<td><code>RandomForest</code>, 40 trees, 24 features</td>
+<td><code>app/src/main/assets/har_fall_model.json</code> (59,679 B)</td>
+<td><strong>On the phone</strong></td>
+</tr>
+<tr>
+<td><strong>Future-risk predictor</strong></td>
+<td>Yes</td>
+<td><code>RandomForest</code>, 120 trees, depth 11, 22 features + Platt calibration</td>
+<td><code>app/src/main/assets/future_risk_model.json</code> (1,974,297 B), version <code>future-risk-unimib-v1</code></td>
+<td><strong>On the phone</strong></td>
+</tr>
+<tr>
+<td><strong>Transport-mode classifier</strong></td>
+<td>Yes</td>
+<td><code>RandomForest</code>, 300 trees, 9 features</td>
+<td><code>ml/outputs/transport/</code></td>
+<td><code>ml/</code> analysis (not shipped)</td>
+</tr>
+<tr>
+<td><strong>Geofence</strong></td>
+<td>No — configured rule</td>
+<td>Polygon test + event log</td>
+<td><code>app/</code> + <code>backend/</code></td>
+<td>Phone + server</td>
+</tr>
+<tr>
+<td><strong>Approach-risk score</strong></td>
+<td>No — heuristic</td>
+<td>Published weighted checklist</td>
+<td><code>app/</code></td>
+<td>Phone</td>
+</tr>
+</tbody>
+</table>
+<p>Three models are exported to JSON and walked by hand-written Kotlin <strong>on the device</strong>, with no
+TensorFlow, TFLite or PyTorch, and no network call at inference time. The two HAR models together are
+under 330 KB, which is why a hand-written walker was chosen over a runtime.</p>
+<hr />
+<h2 id="2-datasets-used">2. Datasets used</h2>
+<h3 id="21-inventory">2.1 Inventory</h3>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>What it actually is</th>
+<th>Scale (measured)</th>
+<th>Licence / terms</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GeoLife GPS Trajectories 1.3</strong></td>
+<td>GPS traces from volunteers, 2000–2012, mostly Beijing</td>
+<td>Archive 313,164,406 B; <strong>182 users; 18,670 <code>.plt</code> files; 24,876,978 data rows; 0 malformed</strong></td>
+<td><strong>No OSI licence bundled</strong> — citation-only, research use</td>
+<td>EDA, anomaly detection, transport model, zone analysis</td>
+</tr>
+<tr>
+<td><strong>UCI HAR</strong></td>
+<td>30 volunteers, scripted activities, waist-mounted phone</td>
+<td><strong>7,352 train / 2,947 test windows</strong>, 561 features, 6 activities, 9 channels @ 50 Hz</td>
+<td>Not documented in this repository — see the UCI dataset page</td>
+<td>EDA, activity recognition, impact detector</td>
+</tr>
+<tr>
+<td><strong>UniMiB SHAR</strong></td>
+<td>30 volunteers performing 9 daily activities and <strong>8 real fall types</strong> in a lab</td>
+<td>Archive 266,206,080 B, SHA-256 <code>365a3967…67160</code>; 1,980 trials read, <strong>1,979 used</strong> @ 50 Hz</td>
+<td>Publicly distributed for academic research; <strong>no explicit OSI licence</strong></td>
+<td>The future-risk model</td>
+</tr>
+<tr>
+<td><strong>OpenStreetMap</strong> (Overpass API)</td>
+<td>Live public map database, bounded extract</td>
+<td><strong>15,980 elements</strong> in 1.5 km × 1.5 km of Tiananmen, Beijing</td>
+<td>© OpenStreetMap contributors, <strong>ODbL</strong></td>
+<td>Map context EDA only — <strong>no model input</strong></td>
+</tr>
+<tr>
+<td><strong>Open-Meteo</strong> weather archive</td>
+<td>Historical weather for two sites</td>
+<td><strong>574 days</strong>, 2011-01-01…2012-07-27</td>
+<td>Free/open archive</td>
+<td>Context EDA only — <strong>no model input</strong></td>
+</tr>
+<tr>
+<td><strong>Synthetic fixture</strong></td>
+<td>Project-generated stand-in</td>
+<td>tiny</td>
+<td>project-internal</td>
+<td>Plumbing test when the real archive is absent</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-the-facts-that-shape-everything-downstream">2.2 The facts that shape everything downstream</h3>
+<ul>
+<li><strong>GeoLife contains no danger, injury or incident labels.</strong> Its only labels are transportation modes
+  (69 users, 14,718 segments). A supervised risk model is therefore impossible, and the trajectory
+  model is <strong>unsupervised</strong> — its output is a movement <em>anomaly score</em>, never a probability of danger.</li>
+<li><strong>UCI HAR contains no falls at all</strong> — no fall class, no impact annotation. The impact detector's
+  positive class was therefore <strong>manufactured</strong> by injecting a fall-like transient into real held-out
+  recordings. Every metric for that model measures detection of the <strong>injected signature</strong>.</li>
+<li><strong>UniMiB SHAR is the only dataset here with a real recorded outcome</strong> (a real fall). That is why the
+  future-risk model is the only one that predicts a <em>future event</em> rather than describing the present.</li>
+<li><strong>The weather provider actually used is Open-Meteo, not OpenWeatherMap.</strong> The brief named
+  OpenWeatherMap, which needs a key we did not have; the fallback is stated on every artefact.</li>
+<li><strong>Two corrections are recorded rather than hidden:</strong> 698,900 duplicate <code>(trajectory, timestamp)</code> rows
+  were removed from GeoLife, and <strong>one corrupt UniMiB recording</strong> (subject 10, <code>Jumping</code>, trial 1 —
+  9,369 non-finite values of 9,624) was <strong>dropped and counted</strong>.</li>
+</ul>
+<h3 id="23-dataset-model-mapping">2.3 Dataset → model mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th style="text-align: center;">Anomaly model</th>
+<th style="text-align: center;">Activity model</th>
+<th style="text-align: center;">Impact detector</th>
+<th style="text-align: center;">Future-risk</th>
+<th style="text-align: center;">Transport</th>
+<th style="text-align: center;">EDA</th>
+<th style="text-align: center;">Map</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GeoLife 1.3</td>
+<td style="text-align: center;"><strong>✔ train + test</strong></td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;"><strong>✔ labels</strong></td>
+<td style="text-align: center;"><strong>✔</strong></td>
+<td style="text-align: center;"><strong>✔</strong></td>
+</tr>
+<tr>
+<td>UCI HAR</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;"><strong>✔ train + test</strong></td>
+<td style="text-align: center;"><strong>✔ train + test</strong></td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;"><strong>✔</strong></td>
+<td style="text-align: center;">–</td>
+</tr>
+<tr>
+<td>UniMiB SHAR</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;"><strong>✔ train + test</strong></td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">✔</td>
+<td style="text-align: center;">–</td>
+</tr>
+<tr>
+<td>OpenStreetMap</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;"><strong>✔</strong></td>
+<td style="text-align: center;"><strong>✔</strong></td>
+</tr>
+<tr>
+<td>Open-Meteo</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: center;"><strong>✔</strong></td>
+<td style="text-align: center;">–</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-eda-performed">3. EDA performed</h2>
+<h3 id="31-geolife-the-twelve-analyses">3.1 GeoLife — the twelve analyses</h3>
+<p>Point-level figures use a fixed-seed sample of <strong>1,429,740 points / 1,200 trajectories</strong>; length,
+duration and per-user figures use all 18,670 trajectories. Outputs: <code>ml/outputs/eda/</code> (12 figures,
+11 tables, <code>findings.md</code>).</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Analysis</th>
+<th>Measured result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Shape / dtypes</td>
+<td>1,429,740 × 15 (point sample); 18,670 × 22 (trajectory summary)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Missing / duplicates</td>
+<td>698,900 duplicate rows, 1 invalid coordinate, 0 unparsable, 0 malformed; <code>dt_s</code> missing = 1,200 (structural)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Spatial extent</td>
+<td>lat 1.27681…51.10710, lon −179.69134…179.99330; density overwhelmingly Beijing</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Length / duration</td>
+<td>points median <strong>504</strong>, mean 1,295, max 92,645; duration median <strong>2,528 s</strong>, max 348,431 s; total distance <strong>1,021,454 km</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Sampling interval</td>
+<td>median <code>dt</code> <strong>2.00 s</strong>, mean 4.74, p95 5.00, max 3,595; <strong>96.3 %</strong> in the 1–5 s band</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Speed</td>
+<td>4,525 of 1,423,352 steps &gt; 60 m/s <strong>excluded</strong>; speed mean <strong>6.55 m/s</strong>, median 3.23, p95 20.72</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Dwell / stops</td>
+<td><strong>557</strong> stops (speed &lt; 0.5 m/s for ≥ 120 s); median 174 s, max 9,945 s</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Time of day</td>
+<td>busiest <strong>09:00</strong> (108,135 fixes); quietest <strong>21:00</strong> (11,095); <strong>no timezone stored</strong></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Spatial plot</td>
+<td>60 sample trajectories</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Outliers</td>
+<td><code>alt_change</code> 47.55 % flagged, <code>straightness_w5</code> 14.86 %, <code>accel_mps2</code> 13.45 %, <code>turn_deg</code> 12.26 %, <code>altitude</code> 11.21 %</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Correlation</td>
+<td>strongest pair <code>speed_mps ~ speed_mean_w5</code>, <strong>r = 0.979</strong> (same motion, different window)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Class balance</td>
+<td>14,718 transport labels across 69 users: walk 6,460 · bus 2,853 · bike 2,089 · taxi 1,179 · car 993 · subway 813 · train 299 · airplane 17 · boat 7 · run 6 · motorcycle 2. <strong>No danger labels exist.</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Critical data quirk found:</strong> <code>.plt</code> file names <strong>collide across users</strong> — 847 ids are shared. Every
+grouping therefore uses <code>traj_uid</code> (user id + file stem); grouping on the bare file name would silently
+merge different people's trajectories, a leakage bug.</p>
+<h3 id="32-uci-har">3.2 UCI HAR</h3>
+<ul>
+<li><strong>Shape:</strong> 561 features per window; 7,352 train / 2,947 test windows; 6 activities; raw window 128
+  samples @ 50 Hz (2.56 s), 9 inertial channels.</li>
+<li><strong>Split:</strong> 21 train / 9 test subjects, <strong>overlap 0</strong> — genuinely subject-disjoint.</li>
+<li><strong>Class balance:</strong> near-uniform (train 986–1,407; test 420–537 per activity). Accuracy is therefore a
+  legitimate headline; no resampling or class weighting was needed.</li>
+<li><strong>Gravity sanity check:</strong> mean total-acceleration magnitude <strong>1.0323 g</strong> (per-activity 1.0075–1.0516 g)
+  — a real measurement centring on gravity. This is what justifies converting live m/s² samples to g.</li>
+<li><strong>Signal bands:</strong> the three walking variants overlap heavily; sitting/standing/lying separate cleanly.
+  This predicted the eventual confusion pattern exactly.</li>
+<li><strong>Feature redundancy:</strong> the 561 features are heavily correlated; accuracy flattens past ~50 features.</li>
+</ul>
+<h3 id="33-unimib-shar-the-window-and-label-construction">3.3 UniMiB SHAR — the window and label construction</h3>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Measured</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trials in / kept</td>
+<td>1,980 / <strong>1,979</strong> (1 corrupt recording dropped)</td>
+</tr>
+<tr>
+<td>Fall trials used</td>
+<td>1,440 (6 excluded — never reached the 2.0 g impact threshold)</td>
+</tr>
+<tr>
+<td>ADL trials</td>
+<td>539</td>
+</tr>
+<tr>
+<td>Windows cut</td>
+<td><strong>51,128</strong> (50-sample window, 10-sample stride)</td>
+</tr>
+<tr>
+<td>Positives</td>
+<td><strong>6,458</strong> → positive rate <strong>12.63 %</strong></td>
+</tr>
+<tr>
+<td>Impact peak range</td>
+<td><strong>2.0299 g … 3.4562 g</strong></td>
+</tr>
+<tr>
+<td>Lead-time histogram (windows per lead)</td>
+<td>50: 923 · 40: 1,268 · 30: 1,412 · 20: 1,425 · 10: 1,430</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why the horizon is one second — measured, not chosen:</strong> fall trials run 151–446 samples (median 174 =
+3.5 s) with the impact near index ~120, leaving ≥ 95 samples of pre-impact signal. A 50-sample window
+ending at least one sample before impact fits in <strong>every</strong> included trial, so 1.0 s is the <strong>longest
+fully supported</strong> horizon.</p>
+<p><strong>Class imbalance is real and severe</strong> (12.63 % positive). Hence <code>class_weight="balanced_subsample"</code>,
+and precision / recall / PR-AUC reported alongside accuracy everywhere — a "always no" model already
+scores 87.1 % accuracy, and the PR-AUC baseline (0.128565) <em>is</em> the positive rate.</p>
+<h3 id="34-map-weather-and-historical-trends">3.4 Map, weather and historical trends</h3>
+<ul>
+<li><strong>OpenStreetMap</strong> (<code>ml/outputs/osm/</code>): 12,783 nodes, 3,197 ways, 0 relations = <strong>15,980 elements</strong>,
+  <strong>5,681.4 nodes/km²</strong>. Top tags: <code>building</code> 1,205 · <code>highway</code> 1,075 · <code>height</code> 800. Highway classes:
+  footway 504, pedestrian 114, steps 104 (17 distinct). Amenity classes: restaurant 36, toilets 22,
+  café 12 (22 distinct). Fetched 2026-10-17T13:39:46Z, cached, and reproducible from the recorded query.</li>
+<li><strong>Weather</strong> (<code>ml/outputs/weather/</code>): 574 days, two sites. <code>geolife_centroid</code> (39.9770 N, 116.3501 E,
+  the <strong>component-wise median</strong> of the cleaned sample) → mean 12.17 °C, precip 806.4 mm, 175 harsh days
+  (30.5 %). <code>huangshan_trek</code> (30.134 N, 118.161 E, an analyst-chosen trekking point) → mean 7.07 °C,
+  precip 2,676.3 mm, 218 harsh days (38.0 %). Harsh-day rule: precip ≥ 10 mm <strong>or</strong> min T ≤ −5 °C <strong>or</strong>
+  max T ≥ 35 °C <strong>or</strong> mean wind ≥ 30 km/h.</li>
+<li><strong>Historical / zone trends</strong> (<code>ml/outputs/history/</code>): 18,670 trajectories / 182 users spanning
+  2000-01-01…2012-07-27. Trajectories per user median 28, max 2,153. Busiest hour 09:00, busiest weekday
+  Saturday, peak month 2008-11. <strong>557 stops, revisit rate 0.487</strong>, most-revisited single place 19 stops.
+  A zone derived from data density (densest 0.02° cell 39.9900 N/116.3300 E, expanded ±0.03° →
+  S 39.95, W 116.29, N 40.03, E 116.37) is crossed by <strong>431</strong> of the 785 intersecting trajectories:
+  <strong>430 entries / 426 exits over 58 months</strong>.</li>
+</ul>
+<h3 id="35-what-the-eda-changed">3.5 What the EDA changed</h3>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Consequent change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.plt</code> names collide across users (847)</td>
+<td>composite <code>traj_uid</code> grouping — prevents silent cross-user leakage</td>
+</tr>
+<tr>
+<td>Irregular, gap-ridden sampling (1–3,595 s)</td>
+<td>120 s segment split; <code>log_dt_s</code> as a feature; no resampling</td>
+</tr>
+<tr>
+<td>GPS jumps (4,525 speeds &gt; 60 m/s)</td>
+<td>jumps kept as a data property; the evaluation injects teleports of the same family</td>
+</tr>
+<tr>
+<td><code>altitude</code> unreliable (47.55 % IQR-flagged)</td>
+<td>documented as unreliable; no conclusion depends on it</td>
+</tr>
+<tr>
+<td>Structural missingness (1,200 <code>dt_s</code>)</td>
+<td>first point of each segment dropped, never imputed</td>
+</tr>
+<tr>
+<td>HAR classes near-balanced</td>
+<td>accuracy used as the headline; no resampling</td>
+</tr>
+<tr>
+<td>HAR walking variants overlap</td>
+<td>the app groups the three as "ambulating" and never acts on the distinction</td>
+</tr>
+<tr>
+<td>561 HAR features redundant</td>
+<td>24-feature on-device subset, with its measured 0.0936 accuracy cost reported</td>
+</tr>
+<tr>
+<td>UniMiB 12.63 % positive rate</td>
+<td>balanced class weights; precision/recall/PR-AUC reported everywhere</td>
+</tr>
+<tr>
+<td>UniMiB impact always ≥ 2.0 g</td>
+<td>2.0 g reused as the shared "hard landing" threshold in code and label rule</td>
+</tr>
+<tr>
+<td>GeoLife has no danger labels</td>
+<td>the trajectory model is unsupervised and never called a probability</td>
+</tr>
+</tbody>
+</table>
+<h3 id="36-figures-from-the-eda">3.6 Figures from the EDA</h3>
+<p><img alt="Trajectory length histogram" src="../ml/outputs/eda/fig_03_traj_length_hist.png" />
+<img alt="Sampling interval histogram" src="../ml/outputs/eda/fig_05_sampling_interval_hist.png" /></p>
+<p><em>Length (median 504 points, heavy right tail) and sampling interval (96.3 % of gaps in 1–5 s). Both drove
+the choice of windowed features and a gap-based segment split rather than fixed-rate resampling.</em></p>
+<p><img alt="Speed histogram" src="../ml/outputs/eda/fig_06_speed_hist.png" />
+<img alt="Time of day" src="../ml/outputs/eda/fig_08_time_of_day.png" /></p>
+<p><em>Speed after removing 4,525 impossible jumps (mean 6.55, median 3.23 m/s) — a plausible human range. The
+daily rhythm peaks at 09:00, which is why <code>tod_sin</code>/<code>tod_cos</code> are model features.</em></p>
+<p><img alt="Correlation heatmap" src="../ml/outputs/eda/fig_11_correlation_heatmap.png" />
+<img alt="Transport mode balance" src="../ml/outputs/eda/fig_12_transport_mode_balance.png" /></p>
+<p><em>The strongest correlation is <code>speed_mps ~ speed_mean_w5</code> at r = 0.979 (harmless for an unsupervised
+scorer, documented rather than hidden). Transport labels are severely imbalanced — walk 6,460 down to
+motorcycle 2 — which is why the transport model uses balanced class weights.</em></p>
+<p><img alt="HAR class balance" src="../ml/outputs/har/eda/fig_har_eda_01_class_balance.png" />
+<img alt="HAR gravity magnitude" src="../ml/outputs/har/eda/fig_har_eda_05_gravity_magnitude.png" /></p>
+<p><em>UCI HAR's near-uniform classes justify accuracy as a headline. The gravity magnitude centres on
+1.0323 g — a real accelerometer reading gravity, which is what justifies the m/s² → g conversion.</em></p>
+<p><img alt="Zone crossing trend" src="../ml/outputs/history/fig_04_zone_crossings_trend.png" /></p>
+<p><em>430 entries / 426 exits over 58 months in a data-derived Beijing zone: real evidence that boundary
+crossings happen at a countable rate.</em></p>
+<hr />
+<h2 id="4-the-models-and-what-they-measured">4. The models and what they measured</h2>
+<h3 id="41-trajectory-anomaly-detector-geolife-unsupervised">4.1 Trajectory anomaly detector (GeoLife, unsupervised)</h3>
+<p><code>IsolationForest</code>, 200 trees, contamination 0.02, seed 42, over 14 standardised movement features. Score
+= <code>-score_samples(scaled_features)</code>; <strong>higher = more anomalous, not a probability</strong>. Trained on
+1,060,493 points (900 trajectories), evaluated on 369,247 points (300 trajectories), split by
+<code>traj_uid</code> with <strong>0 overlap</strong>.</p>
+<p><strong>Accuracy, F1 and a confusion matrix do not exist for this model, and can't:</strong> GeoLife has no anomaly
+labels, so there is nothing to score against. Any such figure would be invented.</p>
+<p>So it was validated by <strong>injection on real data</strong>: GPS teleport bursts (0.02°, run length 3) planted
+into real held-out trajectories.</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Points marked affected</td>
+<td>17,462</td>
+</tr>
+<tr>
+<td>ROC-AUC</td>
+<td><strong>0.8922</strong></td>
+</tr>
+<tr>
+<td>Average precision (PR-AUC)</td>
+<td><strong>0.6763</strong></td>
+</tr>
+<tr>
+<td>Precision@k / Recall@k (k = 17,462)</td>
+<td><strong>0.6165</strong> / <strong>0.6165</strong></td>
+</tr>
+<tr>
+<td><strong>Label-shuffle control ROC-AUC</strong></td>
+<td><strong>0.5007</strong> (chance — the metric is meaningful)</td>
+</tr>
+</tbody>
+</table>
+<p>Thresholds are score quantiles, not tuned: 0.98 → <strong>0.5299</strong> → <strong>2.00 %</strong> flagged (0.90 → 0.4588 → 10 %;
+0.95 → 0.4853 → 5 %; 0.99 → 0.5810 → 1 %; 0.995 → 0.6374 → 0.5 %). Score distribution: train mean
+0.4141 / std 0.0479, test mean 0.4080 / std 0.0437 — train and test match, so the model is not
+memorising the training split.</p>
+<h3 id="42-activity-recognition-uci-har">4.2 Activity recognition (UCI HAR)</h3>
+<p>Official subject-disjoint split: 7,352 train / 2,947 test windows, 21 / 9 subjects, overlap 0.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th style="text-align: right;">Features</th>
+<th style="text-align: right;">Trees</th>
+<th style="text-align: right;">Accuracy</th>
+<th style="text-align: right;">Macro-F1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reference (full detail)</td>
+<td style="text-align: right;">561</td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">0.9287</td>
+<td style="text-align: right;">0.9271</td>
+</tr>
+<tr>
+<td><strong>On-device (shipped)</strong></td>
+<td style="text-align: right;"><strong>24</strong></td>
+<td style="text-align: right;"><strong>32</strong></td>
+<td style="text-align: right;"><strong>0.8351</strong></td>
+<td style="text-align: right;"><strong>0.8333</strong></td>
+</tr>
+<tr>
+<td>Single decision tree (baseline)</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.7967</td>
+<td style="text-align: right;">0.7943</td>
+</tr>
+</tbody>
+</table>
+<p>Per-class, shipped 24-feature model:</p>
+<table>
+<thead>
+<tr>
+<th>Activity</th>
+<th style="text-align: right;">Precision</th>
+<th style="text-align: right;">Recall</th>
+<th style="text-align: right;">F1</th>
+<th style="text-align: right;">Support</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WALKING</td>
+<td style="text-align: right;">0.7363</td>
+<td style="text-align: right;">0.8669</td>
+<td style="text-align: right;">0.7963</td>
+<td style="text-align: right;">496</td>
+</tr>
+<tr>
+<td>WALKING_UPSTAIRS</td>
+<td style="text-align: right;">0.7380</td>
+<td style="text-align: right;">0.7176</td>
+<td style="text-align: right;">0.7277</td>
+<td style="text-align: right;">471</td>
+</tr>
+<tr>
+<td>WALKING_DOWNSTAIRS</td>
+<td style="text-align: right;">0.9507</td>
+<td style="text-align: right;">0.7810</td>
+<td style="text-align: right;">0.8575</td>
+<td style="text-align: right;">420</td>
+</tr>
+<tr>
+<td>SITTING</td>
+<td style="text-align: right;">0.7996</td>
+<td style="text-align: right;">0.8045</td>
+<td style="text-align: right;">0.8020</td>
+<td style="text-align: right;">491</td>
+</tr>
+<tr>
+<td>STANDING</td>
+<td style="text-align: right;">0.8185</td>
+<td style="text-align: right;">0.8139</td>
+<td style="text-align: right;">0.8162</td>
+<td style="text-align: right;">532</td>
+</tr>
+<tr>
+<td>LAYING</td>
+<td style="text-align: right;">1.0000</td>
+<td style="text-align: right;">1.0000</td>
+<td style="text-align: right;">1.0000</td>
+<td style="text-align: right;">537</td>
+</tr>
+<tr>
+<td><strong>Macro average</strong></td>
+<td style="text-align: right;"><strong>0.8405</strong></td>
+<td style="text-align: right;"><strong>0.8307</strong></td>
+<td style="text-align: right;"><strong>0.8333</strong></td>
+<td style="text-align: right;"><strong>2,947</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The cost of shipping the small model is <strong>0.0936 accuracy</strong>; the benefit over a single tree is <strong>0.0384</strong>.
+Both are reported because either alone misleads. The failures are concentrated in the three walking
+variants — which the app groups as one "ambulating" state and never acts on separately.</p>
+<h3 id="43-impact-fall-signature-detector">4.3 Impact (fall-signature) detector</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Test windows</td>
+<td style="text-align: right;">1,848 (924 positive / 924 negative), subject-disjoint</td>
+</tr>
+<tr>
+<td>ROC-AUC</td>
+<td style="text-align: right;"><strong>0.9999</strong></td>
+</tr>
+<tr>
+<td>Average precision (PR-AUC)</td>
+<td style="text-align: right;"><strong>0.9999</strong></td>
+</tr>
+<tr>
+<td>F1 / precision / recall @ 0.5</td>
+<td style="text-align: right;"><strong>0.9962</strong> / 0.9957 / 0.9968</td>
+</tr>
+<tr>
+<td><strong>Shuffled-label control ROC-AUC</strong></td>
+<td style="text-align: right;"><strong>0.5198</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Confusion matrix — derived from the saved precision/recall and n = 924 per class: <strong>TP 921, FP 4, FN 3,
+TN 920</strong> (accuracy 0.9962, specificity 0.9957).</p>
+<p><strong>How to read this.</strong> The shuffled-label control collapses to chance, so the near-perfect score is the
+detector genuinely finding the <strong>injected</strong> signature in real held-out subjects' recordings — not
+leakage. But the positives were manufactured, so <strong>this measures detection of a planted fall, not of a
+real person falling.</strong> §7.2 states the consequence.</p>
+<p><img alt="Injected impact signature" src="../ml/outputs/har/fall/fig_har_fall_03_signal.png" /></p>
+<p><em>One injected impact. A large, stereotyped, high-signal transient produced by a single generator — which
+is exactly why 0.9999 cannot be read as fall-detection performance.</em></p>
+<h3 id="44-future-risk-predictor-unimib-shar-shipped">4.4 Future-risk predictor (UniMiB SHAR, shipped)</h3>
+<p>Subject-disjoint 60/20/20: <strong>18 / 6 / 6</strong> subjects; 31,122 / 9,591 / 10,415 windows. Validation subjects
+[12, 13, 15, 18, 24, 29]; test subjects [2, 3, 5, 9, 14, 28]. The test set was touched <strong>once</strong>, after
+every choice was frozen.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th style="text-align: right;">Precision</th>
+<th style="text-align: right;">Recall</th>
+<th style="text-align: right;">F1</th>
+<th style="text-align: right;">ROC-AUC</th>
+<th style="text-align: right;">PR-AUC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Majority class</td>
+<td style="text-align: right;">0.0000</td>
+<td style="text-align: right;">0.0000</td>
+<td style="text-align: right;">0.0000</td>
+<td style="text-align: right;">0.5000</td>
+<td style="text-align: right;">0.128565</td>
+</tr>
+<tr>
+<td>Logistic regression</td>
+<td style="text-align: right;">0.4760</td>
+<td style="text-align: right;">0.8432</td>
+<td style="text-align: right;">0.6085</td>
+<td style="text-align: right;">0.904389</td>
+<td style="text-align: right;">0.659633</td>
+</tr>
+<tr>
+<td>Hist gradient boosting (<strong>better, not shipped</strong>)</td>
+<td style="text-align: right;"><strong>0.7916</strong></td>
+<td style="text-align: right;">0.6721</td>
+<td style="text-align: right;"><strong>0.7270</strong></td>
+<td style="text-align: right;"><strong>0.945913</strong></td>
+<td style="text-align: right;"><strong>0.815000</strong></td>
+</tr>
+<tr>
+<td>Random forest, raw vote @ 0.5</td>
+<td style="text-align: right;">0.6534</td>
+<td style="text-align: right;">0.7827</td>
+<td style="text-align: right;">0.7122</td>
+<td style="text-align: right;">0.936848</td>
+<td style="text-align: right;">0.764569</td>
+</tr>
+<tr>
+<td><strong>Random forest, calibrated @ HIGH ≥ 0.314046 (shipped)</strong></td>
+<td style="text-align: right;"><strong>0.6707</strong></td>
+<td style="text-align: right;"><strong>0.7498</strong></td>
+<td style="text-align: right;"><strong>0.7080</strong></td>
+<td style="text-align: right;"><strong>0.936848</strong></td>
+<td style="text-align: right;"><strong>0.764569</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Confusion matrix at the HIGH threshold: <strong>TN 8,583 · FP 493 · FN 335 · TP 1,004</strong>.
+Accuracy <strong>0.9205</strong>; Brier 0.056675; specificity 0.9457.</p>
+<p><strong>Calibration</strong> — Platt scaling fitted on validation only (a = 1.24940294, b = −1.07904853). Brier
+improves from 0.062600 (raw) to <strong>0.056675</strong> (calibrated). The top bin is close (0.9–1.0: 496 windows,
+predicted 0.9407, observed 0.8952), but the <strong>middle bins are over-confident</strong> — the 0.3–0.4 bin
+predicted 0.3461 and was positive 0.5000 of the time. The probability is shown in the app <em>only</em>
+because it is calibrated, and always alongside the band, thresholds and version.</p>
+<p><strong>Risk bands</strong> (fitted on validation, then frozen): HIGH ≥ <strong>0.314046</strong> (the max-F1 threshold);
+MODERATE ≥ <strong>0.069201</strong> (the largest threshold whose validation recall is still ≥ 0.95).</p>
+<p><strong>Detection across the horizon</strong> — it does not collapse as the lead grows, so there is real pre-impact
+signal:</p>
+<table>
+<thead>
+<tr>
+<th>Lead</th>
+<th style="text-align: right;">Positive windows</th>
+<th style="text-align: right;">Detected</th>
+<th style="text-align: right;">Rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.2 s</td>
+<td style="text-align: right;">284</td>
+<td style="text-align: right;">204</td>
+<td style="text-align: right;">0.7183</td>
+</tr>
+<tr>
+<td>0.4 s</td>
+<td style="text-align: right;">281</td>
+<td style="text-align: right;">199</td>
+<td style="text-align: right;">0.7082</td>
+</tr>
+<tr>
+<td>0.6 s</td>
+<td style="text-align: right;">281</td>
+<td style="text-align: right;">217</td>
+<td style="text-align: right;">0.7722</td>
+</tr>
+<tr>
+<td>0.8 s</td>
+<td style="text-align: right;">270</td>
+<td style="text-align: right;">213</td>
+<td style="text-align: right;">0.7889</td>
+</tr>
+<tr>
+<td>1.0 s</td>
+<td style="text-align: right;">223</td>
+<td style="text-align: right;">171</td>
+<td style="text-align: right;">0.7668</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Trial-level sensitivity — the number that matters most:</strong> of <strong>284</strong> held-out fall trials, <strong>264</strong> were
+flagged HIGH at least once → <strong>0.9296</strong>. This is the honest headline; window recall (0.7498) is the
+number underneath it.</p>
+<p><strong>False alarms on ordinary activity:</strong> 493 of 9,076 ADL windows → <strong>5.09 false alarms per minute</strong> at
+the app's 0.64 s cadence (16.30/min at the raw 0.2 s stride). By activity: <strong>jumping 16.1 %</strong>, <strong>sitting
+down 15.6 %</strong>, <strong>lying down 12.7 %</strong>, going downstairs 4.4 %, standing up from floor 3.2 %, going
+upstairs 2.5 %, standing up from sofa 2.8 %, running 1.6 %, walking 1.1 %. The three worst confusions are
+the three movements where a body genuinely drops under gravity.</p>
+<p><strong>Leakage controls, checked rather than asserted:</strong> every positive window ends before its own impact
+(true); all leads within the horizon (true); the feature window never overlaps the label window (true);
+min/max lead 10/50 samples. Second control — the <strong>shuffled-label run</strong> scores ROC-AUC <strong>0.47743</strong> /
+PR-AUC <strong>0.129885</strong>, i.e. chance.</p>
+<p><img alt="Future-risk ROC" src="../ml/outputs/future_risk/figures/fig_02_roc.png" />
+<img alt="Future-risk calibration" src="../ml/outputs/future_risk/figures/fig_03_calibration.png" /></p>
+<p><em>ROC-AUC 0.9368 looks strong; the calibration plot is the more important one — the top bin tracks the
+diagonal but the mid-range sits above it.</em></p>
+<p><img alt="Future-risk lead time" src="../ml/outputs/future_risk/figures/fig_05_lead_time.png" /></p>
+<p><em>Detection rate from 0.2 s to 1.0 s before impact. It holds up at the full second, which is the
+interesting positive result.</em></p>
+<h3 id="45-transport-mode-classifier-geolife-labels">4.5 Transport-mode classifier (GeoLife labels)</h3>
+<p>Explicitly <strong>not</strong> a risk model — it predicts the next segment's transportation mode.</p>
+<p>9,584 labelled segments from 69 users; subject-disjoint split 45 / 19 users (8,036 / 1,548 segments);
+<code>RandomForest</code>, 300 trees, 9 features, balanced class weights.</p>
+<p><strong>Accuracy 0.8475 · macro-F1 0.5784 · weighted-F1 0.8507.</strong></p>
+<p>Per-class on unseen users: walk 0.951 F1 (827) · bike 0.829 (168) · bus 0.818 (292) · subway 0.690 (117)
+· car 0.588 (77) · train 0.545 (11) · taxi 0.362 (53) · motorcycle 1.000 (1) · boat, run 0.000 (1 each).
+The macro-F1 is the mean over the <strong>10</strong> classes with test support (<code>airplane</code> has support 0). Top
+features: <code>p95_speed_mps</code> 0.200, <code>distance_m</code> 0.186, <code>mean_speed_mps</code> 0.160, <code>straightness</code> 0.117.</p>
+<p><img alt="Activity confusion matrix (on-device)" src="../ml/outputs/har/train/fig_har_03_confusion_deployable.png" /></p>
+<p><em>The shipped 24-feature activity model's confusion matrix: losses are almost entirely inside the walking
+triad; sitting, standing and laying hold up.</em></p>
+<hr />
+<h2 id="5-training-methodology-compact">5. Training methodology (compact)</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Trajectory anomaly</th>
+<th>Activity</th>
+<th>Impact detector</th>
+<th>Future-risk</th>
+<th>Transport</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Data</strong></td>
+<td>GeoLife</td>
+<td>UCI HAR</td>
+<td>UCI HAR + injected impacts</td>
+<td>UniMiB SHAR</td>
+<td>GeoLife <code>labels.txt</code></td>
+</tr>
+<tr>
+<td><strong>Target</strong></td>
+<td>none (unsupervised)</td>
+<td>6 real activity labels</td>
+<td>injected impact vs untouched</td>
+<td><code>IMMINENT_FALL</code> / <code>NO_IMMINENT_FALL</code></td>
+<td>transport mode</td>
+</tr>
+<tr>
+<td><strong>Features</strong></td>
+<td>14 movement features</td>
+<td>561 (reference) / <strong>24</strong> (shipped)</td>
+<td>24</td>
+<td><strong>22</strong> accelerometer features</td>
+<td>9 segment features</td>
+</tr>
+<tr>
+<td><strong>Window</strong></td>
+<td>point-level + 5-point windows</td>
+<td>128 samples @ 50 Hz (2.56 s)</td>
+<td>128 samples</td>
+<td>50 samples (1.0 s), stride 10 (0.2 s)</td>
+<td>labelled segments</td>
+</tr>
+<tr>
+<td><strong>Horizon</strong></td>
+<td>none (not a forecast)</td>
+<td>none</td>
+<td>none</td>
+<td><strong>1.0 s</strong></td>
+<td>none</td>
+</tr>
+<tr>
+<td><strong>Split</strong></td>
+<td><code>traj_uid</code> 900 / 300 traj, 0 overlap</td>
+<td>official subject-disjoint 21 / 9</td>
+<td>subject-disjoint 21 / 9</td>
+<td>subject-disjoint 18 / 6 / 6</td>
+<td>subject-disjoint 45 / 19 users</td>
+</tr>
+<tr>
+<td><strong>Preprocessing</strong></td>
+<td>standardise; segment at gaps &gt; 120 s</td>
+<td>dataset-provided; m/s² → g</td>
+<td>same 24 features</td>
+<td><strong>none that needs fitting</strong> (all features are scale-free per window)</td>
+<td>segment filtering (&lt; 2 points or &lt; 1 m dropped)</td>
+</tr>
+<tr>
+<td><strong>Hyper-parameters</strong></td>
+<td>200 trees, contamination 0.02</td>
+<td>300/561; <strong>32 trees, depth 8</strong>; 1 tree baseline</td>
+<td>40 trees</td>
+<td><strong>120 trees, depth 11, leaf 4, sqrt, balanced_subsample</strong></td>
+<td>300 trees, leaf 2, balanced</td>
+</tr>
+<tr>
+<td><strong>Balancing / threshold</strong></td>
+<td>quantile thresholds (0.98 → 2 %)</td>
+<td>none needed</td>
+<td>balanced by construction; app gate ≥ 0.55</td>
+<td><code>balanced_subsample</code>; HIGH 0.314046, MODERATE 0.069201; Platt calibration</td>
+<td>balanced class weights</td>
+</tr>
+<tr>
+<td><strong>Seed</strong></td>
+<td>42</td>
+<td>fixed</td>
+<td>fixed</td>
+<td>42</td>
+<td>42</td>
+</tr>
+<tr>
+<td><strong>Selection basis</strong></td>
+<td>single configuration</td>
+<td><strong>deployment size</strong> (JSON asset walkable in Kotlin)</td>
+<td>1 configuration + shuffled control</td>
+<td><strong>2,000,000-byte asset budget</strong> (binding: only 1 of 65 configs fitted)</td>
+<td>class balance handling</td>
+</tr>
+<tr>
+<td><strong>Artifact</strong></td>
+<td><code>ml/models/isolation_forest.joblib</code></td>
+<td><code>app/src/main/assets/har_activity_model.json</code></td>
+<td><code>app/src/main/assets/har_fall_model.json</code></td>
+<td><code>app/src/main/assets/future_risk_model.json</code> (1,974,297 B, <code>future-risk-unimib-v1</code>)</td>
+<td><code>ml/outputs/transport/</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Model selection under the size budget (future-risk).</strong> <code>tune.py</code> searched <strong>65 configurations</strong> on
+validation only. The winner by validation PR-AUC was rejected because it cannot ship: 300 trees
+unlimited depth → val PR-AUC 0.8759 but <strong>20,059.7 KB</strong> / 700,492 nodes. 300 trees depth 8 → 0.8201 but
+<strong>2,003,677 bytes</strong>, over the 2,000,000-byte budget by 3,677. The shipped 120-tree depth-11 forest →
+<strong>0.8451 / 0.9709</strong> in <strong>1,968,314 bytes</strong> / 66,894 nodes. The constraint costs <strong>−0.031 validation
+PR-AUC</strong>, and it is the reason the shipped model is not the best this pipeline can fit. The rule is
+stored in <code>tuning.json</code> and re-derived by a test.</p>
+<p><strong>Training-and-deployment parity (verified, not assumed).</strong></p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th style="text-align: right;">Max feature error</th>
+<th style="text-align: right;">Max probability error</th>
+<th style="text-align: right;">Argmax mismatches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Activity</td>
+<td style="text-align: right;">5.458e-07</td>
+<td style="text-align: right;">4.970e-07</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Impact / fall</td>
+<td style="text-align: right;">6.342e-07</td>
+<td style="text-align: right;">4.736e-07</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Future-risk</td>
+<td style="text-align: right;">parity asserted against scikit-learn on <strong>16 held-out windows</strong> (features, forest and calibration)</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+<p>A test also asserts the app asset is <strong>byte-identical</strong> to the verified training output, so the shipped
+model cannot drift from the trained one.</p>
+<p><strong>Environment:</strong> Python <strong>3.11.9</strong> (Windows); numpy 2.4.4, pandas 3.0.6, scipy 1.17.1, <strong>scikit-learn
+1.8.0</strong>, matplotlib 3.11.2, pytest 9.1.1, joblib 1.5.3. Seed <strong>42</strong> everywhere. A single desktop with
+~8 GB RAM, no GPU. Recorded runtimes: preprocess 539.2 s · EDA 56.5 s · anomaly train 76.7 s ·
+anomaly evaluate 74.01 s · HAR EDA 12.9 s · history 34.1 s · OSM 10.8 s · weather 10.6 s · transport
+282.2 s · future-risk train ~4 min · future-risk tuning ~10 min.</p>
+<hr />
+<h2 id="6-four-risk-concepts-kept-separate">6. Four risk concepts, kept separate</h2>
+<table>
+<thead>
+<tr>
+<th>Shown as</th>
+<th>What it actually is</th>
+<th>Trained?</th>
+<th>Has a probability?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Geofence status</strong></td>
+<td>A configured rule: inside/outside a polygon the authority drew</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Approach risk</strong></td>
+<td>A published weighted checklist over crossing history</td>
+<td>No — documented heuristic</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Activity</strong></td>
+<td>A 6-class classifier over the current 2.56 s window</td>
+<td>Yes</td>
+<td>Confidence only</td>
+</tr>
+<tr>
+<td><strong>Movement / future risk</strong></td>
+<td>An impact detector and a 1-second-ahead impact forecast</td>
+<td>Yes</td>
+<td>Yes, calibrated (future-risk)</td>
+</tr>
+</tbody>
+</table>
+<p>Enforced in code and tests: distinct types throughout, so a screen cannot render the heuristic under the
+trained model's heading; the card's own text names the other concepts and denies being them (asserted by
+a test); <strong>risk never triggers SOS</strong> — <code>backend/tsm/api.py</code> ignores risk entirely when computing state,
+and a HIGH prediction leaves <code>latestSos</code> empty and <code>openSosCount == 0</code> (asserted by
+<code>backend/tests/test_risk.py</code>). Predictions live in their own table, their own endpoints, and their own
+dashboard panel — never the SOS queue or the incident feed.</p>
+<hr />
+<h2 id="7-consolidated-results-and-the-limits-of-this-evidence">7. Consolidated results and the limits of this evidence</h2>
+<h3 id="71-consolidated-results">7.1 Consolidated results</h3>
+<table>
+<thead>
+<tr>
+<th>Model / component</th>
+<th>Dataset</th>
+<th>Evaluation split</th>
+<th>Sample count</th>
+<th style="text-align: right;">Accuracy</th>
+<th style="text-align: right;">Precision</th>
+<th style="text-align: right;">Recall</th>
+<th style="text-align: right;">F1</th>
+<th style="text-align: right;">ROC-AUC</th>
+<th style="text-align: right;">PR-AUC</th>
+<th>Evidence source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trajectory anomaly (unsupervised)</td>
+<td>GeoLife 1.3</td>
+<td>trajectory-disjoint</td>
+<td>369,247 pts / 300 traj (17,462 injected)</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">0.6165 (P@k)</td>
+<td style="text-align: right;">0.6165 (R@k)</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">0.8922 (injection)</td>
+<td style="text-align: right;">0.6763</td>
+<td><code>ml/outputs/eval/eval_report.json</code></td>
+</tr>
+<tr>
+<td>Activity — 561-feature reference</td>
+<td>UCI HAR</td>
+<td>subject-disjoint</td>
+<td>2,947 windows / 9 subjects</td>
+<td style="text-align: right;">0.9287</td>
+<td style="text-align: right;">0.9301 (macro)</td>
+<td style="text-align: right;">0.9258 (macro)</td>
+<td style="text-align: right;">0.9271</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td><code>ml/outputs/har/train/har_train_report.json</code></td>
+</tr>
+<tr>
+<td><strong>Activity — 24-feature on-device (shipped)</strong></td>
+<td>UCI HAR</td>
+<td>same</td>
+<td>2,947 windows</td>
+<td style="text-align: right;"><strong>0.8351</strong></td>
+<td style="text-align: right;">0.8405 (macro)</td>
+<td style="text-align: right;">0.8307 (macro)</td>
+<td style="text-align: right;"><strong>0.8333</strong></td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Impact detector (shipped, synthetic positives)</strong></td>
+<td>UCI HAR + injected</td>
+<td>subject-disjoint</td>
+<td>1,848 windows (924/924)</td>
+<td style="text-align: right;">0.9962</td>
+<td style="text-align: right;">0.9957</td>
+<td style="text-align: right;">0.9968</td>
+<td style="text-align: right;"><strong>0.9962</strong></td>
+<td style="text-align: right;"><strong>0.9999</strong></td>
+<td style="text-align: right;">0.9999</td>
+<td><code>ml/outputs/har/fall/har_fall_report.json</code></td>
+</tr>
+<tr>
+<td>Future-risk — majority class</td>
+<td>UniMiB SHAR</td>
+<td>subject-disjoint</td>
+<td>10,415 windows / 6 subjects</td>
+<td style="text-align: right;">0.8714</td>
+<td style="text-align: right;">0.0000</td>
+<td style="text-align: right;">0.0000</td>
+<td style="text-align: right;">0.0000</td>
+<td style="text-align: right;">0.5000</td>
+<td style="text-align: right;">0.128565</td>
+<td><code>ml/outputs/future_risk/metrics.json</code></td>
+</tr>
+<tr>
+<td>Future-risk — hist gradient boosting (<strong>not shipped</strong>)</td>
+<td>UniMiB SHAR</td>
+<td>same</td>
+<td>10,415</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">0.7916</td>
+<td style="text-align: right;">0.6721</td>
+<td style="text-align: right;">0.7270</td>
+<td style="text-align: right;">0.945913</td>
+<td style="text-align: right;"><strong>0.815000</strong></td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Future-risk — calibrated @ HIGH (shipped)</strong></td>
+<td>UniMiB SHAR</td>
+<td>same</td>
+<td>10,415 (1,339 pos)</td>
+<td style="text-align: right;"><strong>0.9205</strong></td>
+<td style="text-align: right;">0.6707</td>
+<td style="text-align: right;"><strong>0.7498</strong></td>
+<td style="text-align: right;">0.7080</td>
+<td style="text-align: right;"><strong>0.936848</strong></td>
+<td style="text-align: right;">0.764569</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Transport-mode classifier</td>
+<td>GeoLife <code>labels.txt</code></td>
+<td>subject-disjoint</td>
+<td>1,548 segments / 19 users</td>
+<td style="text-align: right;">0.8475</td>
+<td style="text-align: right;">0.5922 (macro)</td>
+<td style="text-align: right;">0.5775 (macro)</td>
+<td style="text-align: right;">0.5784 (macro) / 0.8507 (weighted)</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td><code>ml/outputs/transport/model_metrics.json</code></td>
+</tr>
+</tbody>
+</table>
+<p>Event-level: future-risk <strong>trial sensitivity 0.9296 (264/284)</strong>; trajectory anomaly <strong>group overlap
+between train and test = 0</strong>.</p>
+<h3 id="72-limits-of-this-evidence">7.2 Limits of this evidence</h3>
+<p>These are properties of what <strong>was</strong> built, so they belong in the report rather than being cut away.</p>
+<ol>
+<li><strong>Because the impact detector's positives are synthetic, its 0.9999 is not a fall-detection claim.</strong>
+   It measures detection of an injected signature.</li>
+<li><strong>The future-risk model raises about 5.09 false alarms per minute of ordinary activity</strong>, worst on
+   jumping (16 %), sitting down (16 %) and lying down (13 %), and its mid-range probabilities are
+   over-confident. It is an informational band plus a queued summary — <strong>never</strong> an alarm, and it never
+   sends an SOS.</li>
+<li><strong>The label is a fall impact, not a tourist incident.</strong> UniMiB is 30 healthy adults in a laboratory;
+   UCI HAR is a scripted waist-mounted protocol. No real incident, injury, crime or medical outcome
+   exists in any dataset used, so no supervised tourist-risk model is possible from this data.</li>
+<li><strong>The model cannot tell a dropped phone from a falling person</strong> — no phone-drop class exists in any
+   dataset used.</li>
+<li><strong>Nothing here has run on a physical phone or emulator,</strong> and the app's screens, sensors, GPS and
+   HTTP stack have therefore not been exercised on hardware.</li>
+<li><strong>No user study, interview, survey or usability evaluation was conducted</strong> at any point.</li>
+<li><strong>Some metrics do not exist and are not estimated:</strong> real-anomaly accuracy/F1 for the unsupervised
+   model (no labels); ROC-AUC, PR-AUC, per-class specificity and calibration for the HAR and transport
+   models (never saved); repeated cross-validated subject-disjoint evaluation (single fold only); the
+   impact detector's training-window count.</li>
+<li><strong>Public and laboratory datasets do not validate real tourist safety.</strong> Every metric here is a
+   statement about models on held-out laboratory and public data — not about a tourist.</li>
+</ol>
+<hr />
+<h2 id="8-evidence-appendix">8. Evidence appendix</h2>
+<h3 id="81-model-artifacts">8.1 Model artifacts</h3>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th style="text-align: right;">Bytes</th>
+<th>Version</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml/models/isolation_forest.joblib</code></td>
+<td style="text-align: right;">1,753.5 KB</td>
+<td>—</td>
+<td>offline analysis</td>
+</tr>
+<tr>
+<td><code>app/src/main/assets/har_activity_model.json</code></td>
+<td style="text-align: right;">268,734</td>
+<td>—</td>
+<td>shipped, on-device</td>
+</tr>
+<tr>
+<td><code>app/src/main/assets/har_fall_model.json</code></td>
+<td style="text-align: right;">59,679</td>
+<td>—</td>
+<td>shipped, on-device</td>
+</tr>
+<tr>
+<td><code>app/src/main/assets/har_activity_model_spec.json</code></td>
+<td style="text-align: right;">3,479</td>
+<td>—</td>
+<td>shipped documentation asset</td>
+</tr>
+<tr>
+<td><code>app/src/main/assets/future_risk_model.json</code></td>
+<td style="text-align: right;"><strong>1,974,297</strong></td>
+<td><strong><code>future-risk-unimib-v1</code></strong></td>
+<td>shipped, on-device</td>
+</tr>
+<tr>
+<td><code>app/src/test/resources/future_risk_reference_cases.json</code></td>
+<td style="text-align: right;">28.6 KB</td>
+<td>—</td>
+<td>Kotlin parity test (16 windows)</td>
+</tr>
+<tr>
+<td><code>app/src/test/resources/har_reference_cases.json</code></td>
+<td style="text-align: right;">199.1 KB</td>
+<td>—</td>
+<td>Kotlin parity test (12 windows)</td>
+</tr>
+<tr>
+<td><code>app/src/test/resources/har_fall_reference_cases.json</code></td>
+<td style="text-align: right;">295.6 KB</td>
+<td>—</td>
+<td>Kotlin parity test (12 windows)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="82-commands">8.2 Commands</h3>
+<pre><code class="language-powershell"># from the repository root (Windows, Python 3.11.9)
+python ml\preprocess.py            # GeoLife parse + clean
+python ml\eda.py                   # 12 figures + tables
+python ml\train.py                 # anomaly model
+python ml\evaluate.py              # injection evaluation
+python ml\har_preprocess.py        # UCI HAR extract + verify
+python ml\har_train.py             # activity model
+python ml\har_fall.py              # injected-impact detector
+python ml\har_verify_export.py     # export vs scikit-learn: expect ALL PASS
+python ml\har_eda.py
+python ml\history.py
+python ml\osm_eda.py               # cache; --refresh to re-fetch
+python ml\weather_eda.py           # Open-Meteo unless OPENWEATHER_API_KEY is set
+python ml\transport_mode.py
+python ml\future_risk\train.py     # future-risk model + app asset
+python ml\future_risk\tune.py      # the 65-config size-budget search
+
+powershell -NoProfile -ExecutionPolicy Bypass -File ml\run_all.ps1   # everything offline
+# -Network for the two fetches, -Transport and -FutureRisk for the two slow models
+
+python -m pytest ml\tests ml\future_risk\tests -q
+</code></pre>
+<h3 id="83-test-counts-measured-this-round">8.3 Test counts (measured, this round)</h3>
+<table>
+<thead>
+<tr>
+<th>Suite</th>
+<th>Command</th>
+<th style="text-align: right;">Executed</th>
+<th style="text-align: right;">Passed</th>
+<th style="text-align: right;">Failed</th>
+<th style="text-align: right;">Errors</th>
+<th style="text-align: right;">Skipped</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Android JVM unit</td>
+<td><code>:app:testDebugUnitTest</code></td>
+<td style="text-align: right;"><strong>548</strong></td>
+<td style="text-align: right;"><strong>541</strong></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">7</td>
+</tr>
+<tr>
+<td>Backend (pytest, in-process)</td>
+<td><code>python -m pytest backend/tests -q</code></td>
+<td style="text-align: right;"><strong>265</strong></td>
+<td style="text-align: right;"><strong>265</strong></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Backend acceptance (real subprocess)</td>
+<td><code>python backend/verify_integration.py</code></td>
+<td style="text-align: right;"><strong>41</strong></td>
+<td style="text-align: right;"><strong>41</strong></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Python / ML (pytest)</td>
+<td><code>python -m pytest ml/tests ml/future_risk/tests -q</code></td>
+<td style="text-align: right;"><strong>179</strong></td>
+<td style="text-align: right;"><strong>179</strong></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Android instrumented</td>
+<td><code>:app:compileDebugAndroidTestKotlin</code></td>
+<td style="text-align: right;">0 (compile only)</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table>
+<p>The <strong>7 skipped</strong> Android cases are the opt-in live-backend tests, which run only with
+<code>-Dtsm.e2e.baseUrl</code>. Run against a real Flask server they were <strong>7/7 passed, <code>skipped="0"</code></strong>. The 179 ML
+tests are <code>ml/tests</code> (86) plus <code>ml/future_risk/tests</code> (93). Instrumented Android tests were never
+executed — no device or emulator existed.</p>
+<h3 id="84-model-artifacts-figures-and-raw-outputs">8.4 Model artifacts, figures and raw outputs</h3>
+<ul>
+<li><strong>GeoLife:</strong> <code>ml/outputs/clean/</code> (<code>trajectory_summary.csv</code> 18,670 rows, <code>points_clean_sample.csv</code>
+  1,429,740 rows), <code>ml/outputs/eda/</code> (12 figures, 11 tables), <code>ml/outputs/train/</code>,
+  <code>ml/outputs/eval/</code> (<code>eval_report.json</code>, <code>eval_metrics.csv</code>, <code>top_anomalies.csv</code>,
+  <code>injection_scores.csv</code>), <code>ml/outputs/predict/</code>.</li>
+<li><strong>UCI HAR:</strong> <code>ml/outputs/har/clean/</code>, <code>ml/outputs/har/eda/</code> (6 figures, 5 tables),
+  <code>ml/outputs/har/train/</code> (reports, per-class, figures, model JSON),
+  <code>ml/outputs/har/fall/</code> (ROC, confusion, signal figure, model JSON).</li>
+<li><strong>UniMiB / future-risk:</strong> <code>ml/outputs/future_risk/</code> — <code>metrics.json</code>, <code>dataset_provenance.json</code>,
+  <code>tuning.json</code>, <code>calibration_reliability.csv</code>, <code>test_predictions.csv</code> (10,415 rows),
+  <code>future_risk_reference_cases.json</code>, <code>figures/</code> (6 plots).</li>
+<li><strong>Map / weather / history / transport:</strong> <code>ml/outputs/osm/</code>, <code>ml/outputs/weather/</code>,
+  <code>ml/outputs/history/</code>, <code>ml/outputs/transport/</code>.</li>
+</ul>
+<hr />
+<p><em>Every number in this report was read out of a file in <code>ml/outputs/</code>, <code>ml/models/</code> or
+<code>app/src/main/assets/</code>. Where evidence does not exist, the text says so instead of supplying a number.
+The full-length version of this report, including the complete figure galleries, the dataset-by-dataset
+licence discussion and the full unavailable-metrics inventory, is preserved in
+<code>docs/data_and_ml_analysis_full.md</code>.</em></p></body></html>

@@ -1,0 +1,326 @@
+<!doctype html><html><head><meta charset='utf-8'><title>data_ml_explained_simply</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+     max-width:820px;margin:2rem auto;padding:0 1.2rem;line-height:1.75;color:#1a1a1a;font-size:17px;}
+h1{font-size:2rem;border-bottom:3px solid #2e7d32;padding-bottom:.4rem;}
+h2{font-size:1.45rem;color:#1b5e20;margin-top:2.2rem;border-bottom:1px solid #ddd;padding-bottom:.25rem;}
+h3{font-size:1.15rem;color:#4a148c;margin-top:1.6rem;}
+p{margin:.9rem 0;}
+li{margin:.35rem 0;}
+table{border-collapse:collapse;width:100%;margin:1.2rem 0;font-size:.95rem;}
+th,td{border:1px solid #bbb;padding:.55rem .7rem;text-align:left;vertical-align:top;}
+th{background:#e8f5e9;}
+tr:nth-child(even){background:#fafafa;}
+code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px;font-family:Consolas,monospace;font-size:.88em;}
+pre{background:#f6f6f6;padding:.9rem;border-radius:5px;overflow-x:auto;}
+pre code{background:none;padding:0;}
+blockquote{border-left:4px solid #c8a200;margin:1.2rem 0;padding:.6rem 1.1rem;background:#fffbe6;}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:.8rem 0;background:#fff;}
+hr{border:none;border-top:1px solid #ddd;margin:2rem 0;}
+@media print{body{margin:0;max-width:none;font-size:12pt;line-height:1.6;}
+  h2{page-break-after:avoid;} h3{page-break-after:avoid;}
+  table{page-break-inside:auto;} tr{page-break-inside:avoid;} img{page-break-inside:avoid;}}
+</style></head><body><h1 id="the-simple-version">The simple version</h1>
+<h3 id="what-we-built-what-it-does-and-what-it-honestly-cant-do">What we built, what it does, and what it honestly can't do</h3>
+<p><em>You don't need any technical background to read this. If you do want the full detail — every file,
+every number, every caveat — it's in <a href="data_and_ml_analysis.md"><code>docs/data_and_ml_analysis.md</code></a>.</em></p>
+<hr />
+<h2 id="if-you-only-read-one-thing">If you only read one thing</h2>
+<ul>
+<li>We built a <strong>phone app for tourists</strong>. It watches how the phone moves and shows three simple things:
+  <strong>what the person is doing</strong>, <strong>whether the phone just felt a hard bump</strong>, and <strong>whether they've
+  walked into a no-go area</strong>.</li>
+<li><strong>Five things in it were taught by showing it examples.</strong> Two things are just <strong>rules a person
+  wrote</strong>. We keep those apart on purpose.</li>
+<li>It works well <strong>on the data we had</strong>. But that data came from volunteers and from laboratories —
+  <strong>never from a real tourist</strong>.</li>
+<li>The best result: it can warn about a <strong>recorded lab fall about one second before it lands</strong>, and it
+  catches <strong>93 out of 100</strong>.</li>
+<li>The honest problem: during ordinary activity it <strong>also cries wolf about 5 times a minute</strong>. So it is
+  only ever a hint on the screen. <strong>It never calls for help.</strong></li>
+</ul>
+<hr />
+<h2 id="1-what-the-app-actually-does">1. What the app actually does</h2>
+<p>Imagine a tourist opens the app before a trek.</p>
+<p>The phone starts watching two things: <strong>where it is</strong> (GPS) and <strong>how it's moving</strong> (the motion
+sensors). From that, the app shows a few cards on the screen:</p>
+<ul>
+<li><em>"You appear to be walking."</em></li>
+<li><em>"The phone felt a hard landing."</em></li>
+<li><em>"You are 40 metres from the restricted area."</em></li>
+<li><em>"Something hard might land in the next second."</em></li>
+</ul>
+<p>The tourist also gets a big <strong>SOS button</strong>, and a list of emergency contacts.</p>
+<p>An officer, meanwhile, opens a website on their computer. They see a list of tourists, where each one
+last was, and any SOS alerts. They also see a <strong>separate panel</strong> with the fall warnings — kept apart
+from emergencies, so a guess is never mistaken for a cry for help.</p>
+<p><strong>Two important things:</strong></p>
+<ol>
+<li><strong>The thinking happens on the phone.</strong> It does not need the internet to work out what you're doing.</li>
+<li><strong>Only short summaries are sent.</strong> Never a live feed of your movement, and never raw sensor data.</li>
+</ol>
+<hr />
+<h2 id="2-seven-things-the-app-knows-and-which-ones-are-really-ai">2. Seven things the app knows — and which ones are really "AI"</h2>
+<p>This is the part people most often get wrong, so here it is plainly.</p>
+<table>
+<thead>
+<tr>
+<th>What it shows</th>
+<th>In plain words</th>
+<th>Taught by examples?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Activity</strong></td>
+<td>"Walking? Stairs? Sitting? Standing? Lying down?"</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td><strong>Hard-landing detector</strong></td>
+<td>"Did the phone feel a hard bump, then go quiet?"</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td><strong>Next-second fall hint</strong></td>
+<td>"Will a hard impact land in the next second?"</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td><strong>Weird-GPS score</strong></td>
+<td>"That bit of movement looks odd"</td>
+<td><strong>Yes</strong> — but with no answer key</td>
+</tr>
+<tr>
+<td><strong>Transport mode</strong></td>
+<td>"Bus, bike, car, walking, subway?"</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td><strong>Geofence</strong></td>
+<td>"Are they inside the no-go area?"</td>
+<td><strong>No — just a line on a map</strong></td>
+</tr>
+<tr>
+<td><strong>"Approach risk"</strong></td>
+<td>"How concerning is this approach?"</td>
+<td><strong>No — a scorecard a person set up</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The last two matter. The <strong>geofence is a line an officer draws on a map</strong>. It has no intelligence in
+it at all — it just answers inside or outside. And the <strong>"approach risk" number is a scorecard</strong>: it
+adds up fixed points for how close you are, what time it is, and how often you've been near that spot
+before. A human chose those points. Nothing learned them.</p>
+<p>Neither of those two has a probability, and neither is a prediction. The reports say so every time the
+number appears.</p>
+<hr />
+<h2 id="3-where-the-data-came-from">3. Where the data came from</h2>
+<p>We didn't invent any of this. Five real sources were downloaded and read. Here's what each one
+actually is, in everyday terms.</p>
+<p><strong>GeoLife — a diary of GPS pings.</strong>
+Microsoft collected GPS traces from <strong>182 volunteers over about twelve years, mostly in Beijing</strong>.
+Think of it as "where my phone was" recorded every few seconds, across <strong>18,670 trips</strong> — roughly
+<strong>1,021,454 km</strong> of travel.
+<em>Good for:</em> what real movement looks like, and how often people cross a boundary.
+<em>Can't do:</em> it contains <strong>no dangers, no injuries, no incidents</strong>. So it is impossible to teach a
+computer "risk" from it.</p>
+<p><strong>UCI HAR — thirty people doing exercises in a lab.</strong>
+<strong>30 volunteers</strong> wore a phone on the waist and did six things: walk, walk upstairs, walk downstairs,
+sit, stand, lie down.
+<em>Good for:</em> teaching the app those six activities, because here real people labelled what they were
+doing.
+<em>Can't do:</em> <strong>there are no falls in it.</strong> Nobody fell. Not once.</p>
+<p><strong>UniMiB SHAR — thirty people falling on purpose.</strong>
+<strong>30 volunteers in a lab deliberately fell</strong>, eight different ways, and also did nine normal daily
+activities. These are <strong>real falls</strong> — just in a laboratory.
+<em>Good for:</em> the "next-second fall" hint, because it is the only data we had where a fall really
+happened.
+<em>Can't do:</em> everyone is a healthy adult in a controlled room. A lab fall is not a tourist accident.</p>
+<p><strong>OpenStreetMap — the map itself.</strong>
+Free, open map data. We pulled a 1.5 km × 1.5 km patch of central Beijing and found <strong>15,980 map
+items</strong> — buildings, footpaths, steps, cafés, toilets. It is used to <strong>draw the map</strong>. <strong>No model uses
+it.</strong> (OpenStreetMap asks for a credit line, so the app and the reports carry one.)</p>
+<p><strong>Weather — and a small honesty note.</strong>
+The brief said to use OpenWeatherMap. That service needs a paid key, and we didn't have one. So we used
+a free one called <strong>Open-Meteo</strong> instead — and every single file says which one it actually used. It
+was never quietly passed off as OpenWeatherMap. We got <strong>574 days</strong> of weather for two places: the
+middle of the GeoLife area, and a mountain trekking spot called Huangshan. Huangshan turned out much
+wetter — <strong>2,676 mm of rain against 806 mm</strong>, and more harsh days (38% against 30%).</p>
+<p>There is also a tiny <strong>fake dataset</strong>, used only to check the machinery works when the big files aren't
+installed. Anything made from it is stamped with a loud warning, and <strong>not one number in these reports
+comes from it.</strong></p>
+<hr />
+<h2 id="4-what-we-found-the-good-news">4. What we found — the good news</h2>
+<p>Every number below came out of a file that a training run wrote down. None of it is estimated.</p>
+<p><strong>It can tell what you're doing — about 5 times out of 6.</strong>
+The version small enough to run on the phone gets the activity right <strong>about 83 times out of 100</strong>.
+A much bigger version, too heavy for a phone, gets <strong>93 out of 100</strong>. We chose the smaller one, and we
+report the cost honestly: about <strong>9 points of accuracy</strong> given up so it can fit in your pocket.</p>
+<p><strong>It can see a lab fall coming — about one second early.</strong>
+This is the best result in the project. On people the model had <strong>never seen before</strong>, it flagged
+<strong>264 out of 284 recorded falls</strong> at least once. That's <strong>93 out of 100</strong>. It even works when the
+warning has the full second to run, not just at the last instant.</p>
+<p><strong>It can spot a broken GPS trace — about 89 times out of 100.</strong>
+We couldn't test "danger" because there's no danger in the data. So we tested something we <em>could</em>
+measure: we deliberately broke clean GPS traces (jumping a point two kilometres in one step) and asked
+whether it noticed. It did, <strong>89 times out of 100</strong>. Then we ran the same test with the answers shuffled
+— and it scored a coin flip. That's exactly what you want, because it proves the first number was real.</p>
+<p><strong>It can guess how you're travelling — about 85 times out of 100.</strong>
+Bus, bike, car, walking, subway and so on. Useful context. <strong>Not</strong> a safety feature, and the reports
+label it that way.</p>
+<p><strong>Everything passes its tests.</strong>
+548 phone-app tests, 265 server tests, 41 end-to-end server checks, and 179 machine-learning tests —
+<strong>all passing</strong>.</p>
+<hr />
+<h2 id="5-what-we-honestly-cant-do">5. What we honestly can't do</h2>
+<p>A report with only the good news would be misleading. This is the important half.</p>
+<h3 id="51-we-had-no-real-falls-so-we-made-some-up">5.1 We had no real falls, so we made some up</h3>
+<p>This is the single most important thing to understand.</p>
+<p>The dataset used for the bump detector, <strong>UCI HAR, has no falls in it at all.</strong> So to teach the app
+what a fall feels like, we <strong>took honest recordings and edited falls into them</strong> — a quick drop, a hard
+spike, then stillness.</p>
+<p>The detector spots those <strong>planted</strong> falls almost every time. <strong>That does not mean it spots a real
+person falling.</strong> It means it spots the fall we planted.</p>
+<p>Real falls are messier. Some are gentle. Many look like somebody sitting down quickly. The reports say
+this in bold next to the score, and they also name the public datasets that <em>do</em> contain real falls —
+because retraining on one of those is the one change that would make this a real fall detector.
+<strong>Nobody has done that yet.</strong></p>
+<h3 id="52-the-false-alarms-are-the-real-problem">5.2 The false alarms are the real problem</h3>
+<p>The next-second fall hint is the one trained on real falls — and it has an honest flaw.</p>
+<p>During perfectly ordinary activity, it raises a false "something hard is coming" roughly <strong>5 times
+every minute</strong>.</p>
+<p>Some movements set it off far more than others:</p>
+<ul>
+<li><strong>Jumping — 16 times out of 100</strong></li>
+<li><strong>Sitting down — 16 times out of 100</strong></li>
+<li><strong>Lying down — 13 times out of 100</strong></li>
+<li>Walking — 1 time out of 100</li>
+<li>Running — 2 times out of 100</li>
+</ul>
+<p>And that makes physical sense. Jumping, sitting down and lying down are exactly the moments when a body
+genuinely <strong>drops under gravity</strong> — so of course they can look like the start of a fall.</p>
+<p><strong>This is why it can only ever be a hint.</strong> A high warning raises no alarm, changes nothing, and never
+calls for help. That isn't just a note in the manual — it's built into the code, and a test fails if a
+warning ever causes an emergency to be recorded.</p>
+<h3 id="53-a-dropped-phone-and-a-falling-person-look-the-same">5.3 A dropped phone and a falling person look the same</h3>
+<p>Both are "a hard bump, then stillness". We found no data anywhere with somebody deliberately dropping a
+phone, so this was <strong>never tested</strong>. We list it as an unknown instead of pretending otherwise.</p>
+<h3 id="54-a-lab-is-not-the-real-world">5.4 A lab is not the real world</h3>
+<p>Every recorded fall here is an adult in a laboratory. Every activity recording is somebody doing
+scripted movements with a phone on the waist or in a pocket.</p>
+<p><strong>Nothing</strong> was recorded from a tourist — not outdoors, not in the rain, not at altitude, not with a
+backpack, not on a cable car. Public and lab data <strong>do not prove anything</strong> about real tourist safety.</p>
+<h3 id="55-it-never-ran-on-a-real-phone">5.5 It never ran on a real phone</h3>
+<p>There was no phone and no emulator available. So the sensors, the screens, the permission prompts, the
+real GPS and the phone's own internet connection were <strong>never tried on a device</strong>.</p>
+<p>The maths was checked against the training tools, and the screens were tested as code — but nobody ever
+looked at them running on a phone.</p>
+<h3 id="56-nobody-ever-used-it">5.6 Nobody ever used it</h3>
+<p><strong>No user study. No interviews. No survey. No usability test.</strong> None, at any point.</p>
+<p>So anything that sounds like "how it would feel to use" comes from tests, not from people.</p>
+<h3 id="57-some-numbers-honestly-dont-exist">5.7 Some numbers honestly don't exist</h3>
+<p>Where we couldn't measure something, the reports say <strong>"not available"</strong> and explain why, instead of
+inventing a number.</p>
+<p>The clearest example: the weird-GPS score has <strong>no accuracy and no real-world detection rate</strong>, because
+GeoLife contains no answer key. Any such number would have been made up.</p>
+<hr />
+<h2 id="6-what-happens-when-something-goes-wrong">6. What happens when something goes wrong</h2>
+<p>This is the part that reassures people, and it's all tested.</p>
+<p><strong>If there's no signal</strong> — nothing is lost. The app writes the event into a small database on the
+phone and sends it when the connection comes back.</p>
+<p><strong>What gets sent</strong> — a short summary, never a stream. The app never uploads raw sensor readings and
+never uploads a continuous movement feed.</p>
+<p><strong>When a fall hint changes</strong> — a brief note goes to the officer. That's it.</p>
+<p><strong>The officer's screen</strong> — shows tourists, last known positions, and SOS alerts. Fall predictions sit
+in a <strong>separate panel</strong>. They are never mixed into the emergency queue, and they are counted
+separately.</p>
+<p><strong>SOS is always the tourist's own choice.</strong> The model never triggers it. There is a test that fails if
+it ever does.</p>
+<hr />
+<h2 id="7-why-we-keep-the-rules-and-the-ai-apart">7. Why we keep the rules and the AI apart</h2>
+<p>There are four things in this project that a careless reader could blur into one vague idea of "the
+app predicts danger". They are kept separate in the code, on the screen, and on the server.</p>
+<ol>
+<li><strong>Activity</strong> — what is this person doing? A guess, with a confidence. <strong>Not</strong> a safety score.</li>
+<li><strong>Movement and falls</strong> — was there an impact? Will there be one in the next second? A movement
+   question. <strong>Not</strong> proof that anything happened.</li>
+<li><strong>Geofence</strong> — inside or outside a line. A <strong>rule</strong>. No learning, no probability.</li>
+<li><strong>Approach risk</strong> — a <strong>scorecard</strong> with fixed points. No learning, no probability.</li>
+</ol>
+<p>The app shows all four, and each one says what it is. A test fails if the trained model's card ever
+stops saying that it is <em>not</em> the other three.</p>
+<hr />
+<h2 id="8-words-you-might-see-explained">8. Words you might see, explained</h2>
+<table>
+<thead>
+<tr>
+<th>Word</th>
+<th>What it really means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Unsupervised</strong></td>
+<td>The model had no answer key. It can only say "this looks unusual".</td>
+</tr>
+<tr>
+<td><strong>Anomaly score</strong></td>
+<td>A "weirdness" number. Higher means stranger — <strong>not</strong> more dangerous.</td>
+</tr>
+<tr>
+<td><strong>Precision</strong></td>
+<td>Of the things we flagged, how many were actually real.</td>
+</tr>
+<tr>
+<td><strong>Recall</strong></td>
+<td>Of the real events, how many we managed to catch.</td>
+</tr>
+<tr>
+<td><strong>False alarm</strong></td>
+<td>We flagged something, but nothing was happening.</td>
+</tr>
+<tr>
+<td><strong>Calibration</strong></td>
+<td>When the model says "70%", is it right 70% of the time?</td>
+</tr>
+<tr>
+<td><strong>Unseen people</strong></td>
+<td>We tested on people the model had never met — like testing a doctor only on new patients.</td>
+</tr>
+<tr>
+<td><strong>"Not available"</strong></td>
+<td>We couldn't measure it, so we didn't guess.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-what-we-can-and-cannot-claim">9. What we can and cannot claim</h2>
+<p><strong>We can say:</strong></p>
+<ul>
+<li>It recognises six everyday activities from a phone, on people it has never seen, about <strong>83% of the
+  time</strong>.</li>
+<li>It can flag a <strong>laboratory-recorded</strong> fall up to one second early in <strong>93 of 100</strong> cases.</li>
+<li>It never raises an emergency by itself, never sends raw sensor data, and works with no signal.</li>
+<li>The geofencing, the SOS flow, the officer dashboard and the offline queue all work and are tested.</li>
+<li>Every number in the technical report can be traced to a file a script wrote.</li>
+</ul>
+<p><strong>We cannot say:</strong></p>
+<ul>
+<li>That it detects real falls in the real world.</li>
+<li>That it predicts danger, injury, crime or medical events. No data for that exists here.</li>
+<li>That it tells a dropped phone apart from a falling person.</li>
+<li>That it has ever run on a phone, or been used by a tourist.</li>
+<li>That any tourist's safety has measurably improved.</li>
+</ul>
+<hr />
+<h2 id="10-the-one-sentence-version">10. The one-sentence version</h2>
+<blockquote>
+<p>It's a well-built, honestly-documented demonstration that can recognise ordinary activities and
+<strong>laboratory</strong> falls from a phone — and it deliberately refuses to promise anything about real
+tourists, because nobody has ever tested it on one.</p>
+</blockquote>
+<hr />
+<p><em>Every number here also appears in the technical report, attached to the file it came from. Where
+evidence doesn't exist, this document says so instead of supplying a number — and that is the most
+important habit in the whole project.</em></p>
+<p><em>Full technical detail: <a href="data_and_ml_analysis.md"><code>docs/data_and_ml_analysis.md</code></a></em></p></body></html>

@@ -8,6 +8,7 @@ import com.touristsafety.app.authority.AuthorityRoles
 import com.touristsafety.app.authority.AuthoritySessionStore
 import com.touristsafety.app.authority.AuthorityTouristRow
 import com.touristsafety.app.authority.OfficerSession
+import com.touristsafety.app.authority.sessionWrite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,16 +64,24 @@ class OfficerViewModel(
             val address = sessions.current().baseUrl
             if (address.isBlank()) {
                 _message.value =
-                    "No authority address is set. Open Settings → Backend connection (advanced)."
+                    "No authority address is set. Open Backend settings and enter the server address."
                 return@launch
             }
             _busy.value = true
             _message.value = "Signing in to $address..."
             _message.value = when (val call = client.login(AuthorityRoles.AUTHORITY, officerId.trim(), password, deviceId)) {
                 is AuthorityCall.Ok -> {
-                    sessions.saveOfficerLogin(address, call.value)
-                    refresh()
-                    "Signed in as ${call.value.displayName} (${call.value.subjectId})."
+                    // The officer is only signed in once the token is stored, so a failed write is
+                    // reported instead of a console that the next screen would refuse to open.
+                    val failure = sessionWrite(
+                        "Signed in, but this phone could not store the officer session",
+                    ) { sessions.saveOfficerLogin(address, call.value) }
+                    if (failure == null) {
+                        refresh()
+                        "Signed in as ${call.value.displayName} (${call.value.subjectId})."
+                    } else {
+                        failure
+                    }
                 }
 
                 is AuthorityCall.HttpError ->
@@ -98,11 +107,15 @@ class OfficerViewModel(
             if (!token.isNullOrBlank()) {
                 client.logout(token)
             }
-            sessions.clearOfficerLogin()
-            _tourists.value = emptyList()
-            _registerLoaded.value = false
+            val failure = sessionWrite("Could not clear this phone's session") {
+                sessions.clearOfficerLogin()
+            }
+            if (failure == null) {
+                _tourists.value = emptyList()
+                _registerLoaded.value = false
+            }
             _busy.value = false
-            _message.value = "Signed out of the authority console."
+            _message.value = failure ?: "Signed out of the authority console."
         }
     }
 
@@ -127,11 +140,18 @@ class OfficerViewModel(
                     401, 403 -> {
                         // The server no longer accepts this token: expired, revoked, or never an
                         // officer's. Drop it so the screen shows the sign-in form again rather than a
-                        // console that can only ever fail.
-                        sessions.clearOfficerLogin()
-                        _tourists.value = emptyList()
-                        _registerLoaded.value = false
-                        _message.value = "The authority refused that session (HTTP ${call.status}). Sign in again."
+                        // console that can only ever fail. If it cannot be dropped, say so.
+                        val failure = sessionWrite(
+                            "The authority refused that session, but this phone could not clear it",
+                        ) { sessions.clearOfficerLogin() }
+                        if (failure == null) {
+                            _tourists.value = emptyList()
+                            _registerLoaded.value = false
+                            _message.value =
+                                "The authority refused that session (HTTP ${call.status}). Sign in again."
+                        } else {
+                            _message.value = failure
+                        }
                     }
 
                     else -> _message.value =

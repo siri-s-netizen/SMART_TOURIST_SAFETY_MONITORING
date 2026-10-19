@@ -4,6 +4,7 @@ import android.content.Context
 import com.touristsafety.app.authority.AuthorityClient
 import com.touristsafety.app.authority.AuthoritySessionStore
 import com.touristsafety.app.authority.AuthoritySyncTransport
+import com.touristsafety.app.authority.AuthorityZoneSync
 import com.touristsafety.app.authority.HttpUrlConnectionAuthorityHttp
 import com.touristsafety.app.authority.SelectingSyncTransport
 import com.touristsafety.app.authority.createAuthoritySessionStore
@@ -132,7 +133,7 @@ class AppContainer(private val appContext: Context) {
      * subscription: there is exactly one accelerometer listener on the device, and the risk model
      * reads the last second of the very window the fall model just analysed.
      */
-    val movementController: MovementController by lazy {
+    private val movementControllerLazy: Lazy<MovementController> = lazy {
         MovementController(
             motionSource = motionSource,
             activityForest = MovementModels.activity(appContext.assets),
@@ -142,9 +143,43 @@ class AppContainer(private val appContext: Context) {
         )
     }
 
+    val movementController: MovementController by movementControllerLazy
+
+    /**
+     * Stops the movement watch as part of signing the tourist out.
+     *
+     * Deliberately **not** a plain [movementController] reference from the dashboard: constructing the
+     * controller parses the trained forests (about 2.3 MB of JSON), and the Home screen must not pay
+     * that cost merely to be able to sign out. Touching it only when it has already been created is
+     * also the only case in which there is anything to stop — a watch that was never started holds no
+     * sensor subscription and no listener to release.
+     */
+    fun stopMovementWatchIfStarted() {
+        if (movementControllerLazy.isInitialized()) {
+            movementController.stop()
+        }
+    }
+
     // ---------------------------------------------------------------- offline outbox + watch
 
-    val outboxRepository: OutboxRepository by lazy { OutboxRepository(database.outboxEventDao()) }
+    /**
+     * The offline queue, bound to the currently signed-in tourist.
+     *
+     * The owner is resolved from the session store on *every* enqueue and every delivery, so an
+     * account switch takes effect immediately with nothing to rebuild: an event queued by Tourist A is
+     * stamped with A's id and is never uploaded while B holds the token.
+     *
+     * That id is the authority's own stable subject id — the value it writes into `sessions.subject_id`
+     * and the one it files an uploaded event against (`backend/tsm/api.py`). It is deliberately not the
+     * display name and not the base URL. It is absent whenever nobody is signed in, which is what
+     * marks a new event *unassigned* instead of misattributed.
+     */
+    val outboxRepository: OutboxRepository by lazy {
+        OutboxRepository(
+            dao = database.outboxEventDao(),
+            currentOwner = { authoritySessionStore.current().subjectId },
+        )
+    }
 
     val emergencyContactRepository: EmergencyContactRepository by lazy {
         EmergencyContactRepository(database, database.emergencyContactDao())
@@ -219,6 +254,27 @@ class AppContainer(private val appContext: Context) {
         FutureRiskReporter(
             outboxRepository = outboxRepository,
             isConfigured = { authoritySessionStore.current().isConfigured },
+        )
+    }
+
+    /**
+     * Keeps this phone's copy of the authority's **published zones** current.
+     *
+     * The other half of shared zone management: an officer draws a boundary in the console, the
+     * authority stores it, and this fetches it into the same `geo_fences` table the existing geofence
+     * engine already reads. That is why the tracking pipeline needed no change — a published zone
+     * arrives as an ordinary row, marked `AUTHORITY`, that the engine evaluates exactly like a local
+     * one.
+     *
+     * It reads `GET /zones` with the *tourist* token and never calls a management route, and the write
+     * it performs cannot touch a local zone: the repository's read and delete are both scoped to
+     * `source = 'AUTHORITY'`.
+     */
+    val authorityZoneSync: AuthorityZoneSync by lazy {
+        AuthorityZoneSync(
+            sessions = authoritySessionStore,
+            client = authorityClient,
+            geoFences = geoFenceRepository,
         )
     }
 
@@ -318,6 +374,11 @@ class AppContainer(private val appContext: Context) {
                 delay(SYNC_RETRY_INTERVAL_MILLIS)
             }
         }
+
+        // Keep the authority's published zones current: once on sign-in, then periodically while that
+        // session lasts. Signed out, it does nothing at all and leaves the zones already downloaded in
+        // place, because a tourist who signs out has not withdrawn from a restricted area.
+        authorityZoneSync.start(appScope)
     }
 
     private companion object {

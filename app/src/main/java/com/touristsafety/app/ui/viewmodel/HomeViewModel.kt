@@ -14,6 +14,7 @@ import com.touristsafety.app.domain.model.GeoFenceZone
 import com.touristsafety.app.domain.model.GeoReading
 import com.touristsafety.app.settings.AppSettings
 import com.touristsafety.app.settings.SettingsRepository
+import com.touristsafety.app.tracking.BackgroundTrackingControl
 import com.touristsafety.app.tracking.TrackingController
 import com.touristsafety.app.tracking.TrackingSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,7 @@ enum class BackgroundServiceStatus(val label: String) {
  */
 class HomeViewModel(
     private val trackingController: TrackingController,
+    private val backgroundControl: BackgroundTrackingControl,
     private val geoFenceRepository: GeoFenceRepository,
     private val alertRepository: AlertRepository,
     locationRepository: LocationRepository,
@@ -48,6 +50,14 @@ class HomeViewModel(
     private val authoritySessionStore: AuthoritySessionStore,
     private val authorityClient: AuthorityClient,
     outboxRepository: OutboxRepository,
+    /**
+     * Releases the on-device movement watch when the tourist signs out.
+     *
+     * A lambda rather than a [com.touristsafety.app.motion.MovementController] because constructing
+     * that controller parses the trained forests, and the dashboard must not pay for a model it never
+     * displays. Supplied by `AppContainer`, which only touches the controller if it was ever created.
+     */
+    private val stopMovementWatch: () -> Unit = {},
 ) : ViewModel() {
 
     val snapshot: StateFlow<TrackingSnapshot> = trackingController.snapshot
@@ -146,16 +156,42 @@ class HomeViewModel(
     /**
      * Ends the tourist's session on this phone.
      *
-     * The server-side token is revoked first (best effort — a token that cannot be revoked is still
-     * discarded here), so signing out on the dashboard is not the only way to kill it. Nothing queued
-     * is lost: the outbox is untouched and goes out after the next sign-in.
+     * Signing out is a **stop**, not just a forgotten token. Before this existed, the dashboard
+     * dropped the login and navigated away while the GPS subscription, the foreground service and the
+     * accelerometer watch all kept running — a phone that had been signed out of went on recording
+     * and queueing the tourist's position. The order below is therefore deliberate:
+     *
+     *  1. the movement watch is released, so no further window is analysed (and no prediction is
+     *     reported from a watch that has stopped);
+     *  2. the foreground service is taken down **only if it is actually up**, so signing out on a
+     *     phone that never enabled background tracking cannot start one just to stop it;
+     *  3. the GPS subscription is cancelled and the tracking state cleared, so nothing is left
+     *     claiming to be tracking;
+     *  4. only then is the server asked to revoke the token — best effort, because a phone out of
+     *     signal must still be able to sign out;
+     *  5. the local login is cleared last, so a token that could not be revoked on the server is at
+     *     least discarded here.
+     *
+     * **Nothing queued is lost.** The outbox is never touched: every pending position report, zone
+     * crossing, SOS and risk summary stays on the phone, and goes out after the next sign-in. The
+     * authority/officer session lives under its own keys and is untouched by this.
      */
     fun signOut(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
+            stopMovementWatch()
+
+            if (trackingController.foregroundServiceRunning.value) {
+                backgroundControl.stop()
+            }
+            trackingController.stop()
+
             val session = authoritySessionStore.current()
             val token = session.token
             if (!token.isNullOrBlank()) {
-                authorityClient.logout(token)
+                // Best effort: an unreachable authority must not trap the tourist in a session they
+                // asked to leave. `logout` already maps a dead network to an Unreachable result rather
+                // than throwing; `runCatching` is belt-and-braces against anything else.
+                runCatching { authorityClient.logout(token) }
             }
             authoritySessionStore.clearLogin()
             _message.value = "Signed out. Queued alerts stay on this phone until you sign in again."

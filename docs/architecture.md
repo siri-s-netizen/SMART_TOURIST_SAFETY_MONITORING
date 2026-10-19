@@ -216,7 +216,10 @@ Containment maths never touches either map implementation.
                                                  │
                                                  └──── Officer sign out (clears the officer only)
 
-          Settings ──▶ Backend connection (advanced)   ← the address, the queue, Test connection
+          Settings ──▶ Backend connection (advanced)   ← the same address card, the queue, Test connection
+
+          Welcome / TouristAuth / Officer ──▶ Backend settings  ← the address, Save address, Test connection
+                                              (reachable with no sign-in at all)
 ```
 
 `AuthoritySessionStore` holds **two** subjects (tourist and officer) plus the shared base URL, in the

@@ -21,6 +21,26 @@ interface OutboxEventDao {
     @Query("SELECT * FROM outbox_events WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT :limit")
     suspend fun pending(limit: Int): List<OutboxEventEntity>
 
+    /**
+     * The pending rows that belong to [owner], oldest first, for delivery.
+     *
+     * Two deliberate properties of this query rather than of a filter applied later:
+     *
+     *  * `owner_subject_id = :owner` never matches `NULL` in SQL, so an **unassigned** row (queued
+     *    before ownership existed, or queued while signed out) can never be handed to a transport;
+     *  * another tourist's row is simply not selected, so it is *deferred*, not re-stamped and not
+     *    marked failed.
+     */
+    @Query(
+        "SELECT * FROM outbox_events WHERE status = 'PENDING' AND owner_subject_id = :owner " +
+            "ORDER BY created_at ASC LIMIT :limit",
+    )
+    suspend fun pendingOwnedBy(owner: String, limit: Int): List<OutboxEventEntity>
+
+    /** Rows still waiting that have no owner at all — what the recovery policy has to account for. */
+    @Query("SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING' AND owner_subject_id IS NULL")
+    suspend fun countUnassigned(): Int
+
     @Query("SELECT * FROM outbox_events ORDER BY created_at DESC")
     fun observeAll(): Flow<List<OutboxEventEntity>>
 
@@ -29,6 +49,9 @@ interface OutboxEventDao {
 
     @Query("SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING'")
     fun observePendingCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING' AND owner_subject_id IS NULL")
+    fun observeUnassignedCount(): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM outbox_events WHERE kind = :kind AND status = 'PENDING'")
     fun observePendingCountOfKind(kind: String): Flow<Int>

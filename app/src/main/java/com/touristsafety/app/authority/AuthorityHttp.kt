@@ -2,6 +2,7 @@ package com.touristsafety.app.authority
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -48,7 +49,14 @@ class HttpUrlConnectionAuthorityHttp(
 
     override suspend fun execute(request: AuthorityHttpRequest): AuthorityHttpResponse =
         withContext(Dispatchers.IO) {
-            val connection = (URL(request.url).openConnection() as HttpURLConnection)
+            // `as?` rather than `as`: a stored address can only be http/https (the settings screen
+            // refuses anything else), but a value written by an older build is not checked here, and a
+            // non-HTTP scheme would otherwise throw `ClassCastException` out of the client. A failed
+            // cast becomes an ordinary IOException, which the client already reports as "cannot reach".
+            val connection = (URL(request.url).openConnection() as? HttpURLConnection)
+                ?: throw IOException(
+                    "Only http:// and https:// addresses can be dialled (asked for ${request.url}).",
+                )
             try {
                 connection.requestMethod = request.method
                 connection.connectTimeout = connectTimeoutMillis

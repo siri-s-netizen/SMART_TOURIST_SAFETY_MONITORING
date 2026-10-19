@@ -207,6 +207,14 @@ modified.
 Self-contained under `ml/`; **supplements — never replaces** the deterministic geo-fencing in `app/`
 and does not touch `app/`.
 
+> **Consolidated data, model and evaluation evidence → [`docs/data_and_ml_analysis.md`](data_and_ml_analysis.md)**
+> (with `.html` and `.pdf` beside it). Every dataset, EDA finding, qualitative example, metric,
+> training methodology, leakage check and the full evidence appendix, in one place. §7.14 below
+> carries the headline results table.
+>
+> **Prefer plain English? → [`docs/data_ml_explained_simply.md`](data_ml_explained_simply.md)** — the
+> same findings and the same numbers, written for a reader who is not a data scientist.
+
 ### 7.1 Dataset (real, verified)
 Microsoft Research **GeoLife GPS Trajectories 1.3** — the official archive was **downloaded and
 unzipped here** (313,164,406 bytes, 298.7 MB). Measured scale: **182 user directories, 18,670
@@ -629,6 +637,44 @@ so its seven cases skip in this run; their last measured result is §7.12's **7/
 **Not verified:** that the banner actually clears on the phone — that needs the new APK installed on a real
 device (INST-24/25). What is proven is that the artefact now contains the policy Android requires, and that
 the setting cannot silently regress without a failing test.
+
+---
+
+### 7.14 Consolidated data, model and evaluation evidence
+
+The complete data-science record — dataset documentation, EDA, qualitative and quantitative analysis,
+per-model training methodology, the separation of the four risk concepts, the consolidated results
+table and the evidence appendix — is in **`docs/data_and_ml_analysis.md`** (`.html`/`.pdf` beside it).
+It was written strictly from the saved artefacts in `ml/outputs/`, `ml/models/` and
+`app/src/main/assets/`: every number is read back out of the file that produced it, and metrics or studies
+that do not exist are stated plainly as missing rather than filled in (the complete inventory of
+unavailable results is kept in `docs/data_and_ml_analysis_full.md`).
+
+Headline numbers — all held-out, all traceable to a named file:
+
+| Model | Dataset | Split | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Trajectory anomaly (unsupervised) | GeoLife 1.3 | trajectory-disjoint | NOT AVAILABLE | 0.6165 (P@k) | 0.6165 (R@k) | N/A | 0.8922 (injection) | 0.6763 |
+| Activity recognition — on-device (shipped) | UCI HAR | subject-disjoint | 0.8351 | 0.8405 (macro) | 0.8307 (macro) | 0.8333 | NOT AVAILABLE | NOT AVAILABLE |
+| Activity recognition — 561-feature reference | UCI HAR | subject-disjoint | 0.9287 | 0.9301 | 0.9258 | 0.9271 | NOT AVAILABLE | NOT AVAILABLE |
+| Impact detector (shipped, **synthetic positives**) | UCI HAR + injected | subject-disjoint | 0.9962 | 0.9957 | 0.9968 | 0.9962 | 0.9999 | 0.9999 |
+| Future-risk, calibrated @ HIGH (shipped) | UniMiB SHAR | subject-disjoint | 0.9205 | 0.6707 | 0.7498 | 0.7080 | 0.9368 | 0.7646 |
+| Hist gradient boosting (better, **not shippable**) | UniMiB SHAR | subject-disjoint | NOT AVAILABLE | 0.7916 | 0.6721 | 0.7270 | 0.9459 | 0.8150 |
+| Transport mode (**not a risk model**) | GeoLife `labels.txt` | subject-disjoint | 0.8475 | 0.5922 (macro) | 0.5775 (macro) | 0.5784 (macro) | NOT AVAILABLE | NOT AVAILABLE |
+
+Three points the consolidated document makes that this report must not lose:
+
+1. **The future-risk model is the only one trained on real falls** — and it still forecasts one second
+   ahead, with **5.09 false alarms per minute** of ordinary activity at the app's cadence, worst on
+   jumping, sitting down and lying down. Trial-level sensitivity is 0.9296 (264/284), which is the
+   honest headline; window recall is 0.7498.
+2. **The geofence is a configured rule and the approach score is a published weighted checklist.**
+   Neither is a trained model and neither has a probability. The four risk concepts are separated
+   structurally in the code and pinned by tests (§7.8, §7.9, §7.10).
+3. **Datasets used, all verified on disk:** GeoLife 1.3 (18,670 `.plt`, 24,876,978 rows), UCI HAR
+   (7,352 / 2,947 windows), UniMiB SHAR (1,979 trials, archive SHA-256 recorded), OpenStreetMap
+   (Overpass, ODbL) and Open-Meteo (**not** OpenWeatherMap). Public and laboratory data **do not
+   validate real tourist safety**, and no user study was conducted (`NOT CONDUCTED`).
 
 ---
 

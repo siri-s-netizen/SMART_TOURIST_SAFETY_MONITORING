@@ -109,6 +109,14 @@ data class OutboxEvent(
     val status: OutboxStatus = OutboxStatus.PENDING,
     val origin: OutboxOrigin = OutboxOrigin.GPS,
     val lastError: String? = null,
+    /**
+     * The stable subject id of the tourist who raised this event, or `null` when nobody was signed in
+     * (see [com.touristsafety.app.data.database.entity.OutboxEventEntity.ownerSubjectId]).
+     *
+     * [com.touristsafety.app.data.repository.OutboxRepository.enqueue] stamps it from the signed-in
+     * session, so producers do not have to know who is signed in.
+     */
+    val ownerSubjectId: String? = null,
 ) {
     val isPending: Boolean get() = status == OutboxStatus.PENDING
 }

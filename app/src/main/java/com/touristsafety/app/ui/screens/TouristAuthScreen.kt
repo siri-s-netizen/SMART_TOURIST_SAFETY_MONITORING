@@ -156,8 +156,8 @@ fun TouristAuthScreen(
             item {
                 NoticeRow(
                     text = "This app has no authority address yet, so it cannot create an account " +
-                        "or sign in. Open Settings → Backend connection (advanced) and enter the address " +
-                        "of the computer running the authority service.",
+                        "or sign in. Open Backend settings and enter the address of the computer " +
+                        "running the authority service.",
                 )
                 CardSpacer()
                 OutlinedButton(
@@ -172,7 +172,8 @@ fun TouristAuthScreen(
             item {
                 NoticeRow(
                     text = "The authority at ${session.baseUrl} is not answering. Check that the " +
-                        "server is running and that this phone is on the same Wi-Fi network.",
+                        "server is running and that this phone is on the same Wi-Fi network. If the " +
+                        "server's address has changed since you set it, tap Change address below.",
                 )
                 CardSpacer()
             }
@@ -184,6 +185,7 @@ fun TouristAuthScreen(
                 address = session.baseUrl,
                 busy = busy,
                 onRecheck = { viewModel.probeConnection() },
+                onChangeAddress = onOpenBackendSettings,
             )
             CardSpacer()
         }
@@ -325,6 +327,7 @@ private fun ConnectionRow(
     address: String,
     busy: Boolean,
     onRecheck: () -> Unit,
+    onChangeAddress: () -> Unit,
 ) {
     val (label, detail) = when (connection) {
         AuthorityConnectionState.CONNECTED -> "Connected" to "The authority answered at $address."
@@ -352,6 +355,9 @@ private fun ConnectionRow(
         CardSpacer()
         ActionButtonRow {
             OutlinedButton(onClick = onRecheck, enabled = !busy) { Text("Check again") }
+            // Always reachable, whatever the status: a server whose address has moved is the one
+            // failure this phone cannot fix by retrying, so the door out of it is never hidden.
+            OutlinedButton(onClick = onChangeAddress, enabled = !busy) { Text("Change address") }
         }
     }
 }

@@ -8,7 +8,9 @@ import com.touristsafety.app.domain.model.OutboxOrigin
 import com.touristsafety.app.outbox.DeliveryResult
 import com.touristsafety.app.outbox.FakeSyncTransport
 import com.touristsafety.app.outbox.OutboxSyncer
+import com.touristsafety.app.testing.TEST_TOURIST_ID
 import com.touristsafety.app.testing.inMemoryDatabase
+import com.touristsafety.app.testing.ownedOutbox
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
@@ -36,7 +38,7 @@ class FutureRiskReporterTest {
     @Before
     fun setUp() {
         database = inMemoryDatabase()
-        repository = OutboxRepository(database.outboxEventDao())
+        repository = ownedOutbox(database.outboxEventDao())
     }
 
     @After
@@ -91,6 +93,11 @@ class FutureRiskReporterTest {
         assertEquals(OutboxKind.RISK, pending.single().kind)
         assertEquals("risk:$now", pending.single().dedupeKey)
         assertEquals("a model output is not a simulation", OutboxOrigin.ON_DEVICE_MODEL, pending.single().origin)
+        assertEquals(
+            "a prediction must be attributed to the tourist it describes",
+            TEST_TOURIST_ID,
+            pending.single().ownerSubjectId,
+        )
     }
 
     @Test

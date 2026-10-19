@@ -9,6 +9,7 @@ import com.touristsafety.app.domain.model.OutboxStatus
 import com.touristsafety.app.testing.deleteDatabaseFile
 import com.touristsafety.app.testing.fileDatabase
 import com.touristsafety.app.testing.inMemoryDatabase
+import com.touristsafety.app.testing.ownedOutbox
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -35,7 +36,7 @@ class OutboxQueueTest {
     @Before
     fun setUp() {
         database = inMemoryDatabase()
-        repository = OutboxRepository(database.outboxEventDao())
+        repository = ownedOutbox(database.outboxEventDao())
     }
 
     @After
@@ -143,12 +144,12 @@ class OutboxQueueTest {
         deleteDatabaseFile(name)
 
         val first = fileDatabase(name)
-        OutboxRepository(first.outboxEventDao()).enqueue(event("sos:1", kind = OutboxKind.SOS))
+        ownedOutbox(first.outboxEventDao()).enqueue(event("sos:1", kind = OutboxKind.SOS))
         first.close()
 
         val second = fileDatabase(name)
         try {
-            val pending = OutboxRepository(second.outboxEventDao()).pending()
+            val pending = ownedOutbox(second.outboxEventDao()).pending()
             assertEquals(1, pending.size)
             assertEquals(OutboxKind.SOS, pending.single().kind)
         } finally {

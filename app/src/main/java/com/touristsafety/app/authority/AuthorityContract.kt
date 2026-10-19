@@ -1,6 +1,8 @@
 package com.touristsafety.app.authority
 
 import com.touristsafety.app.domain.model.EmergencyContact
+import java.net.URI
+import java.net.URISyntaxException
 
 /**
  * The wire contract with the authority backend, mirroring `backend/tsm/api.py` one route at a time.
@@ -21,7 +23,7 @@ object AuthorityEndpoints {
     const val PIN: String = "/api/v1/me/pin"
     const val SYNC_EVENTS: String = "/api/v1/sync/events"
 
-    /** The operator-facing routes the web dashboard uses; here so the app can report reachability. */
+    /** The operator-facing routes; every one of them is guarded by `require_auth("authority")`. */
     const val AUTHORITY_OVERVIEW: String = "/api/v1/authority/overview"
 
     /**
@@ -29,6 +31,23 @@ object AuthorityEndpoints {
      * with 403, which is what makes the officer view in this app a role, not a hidden screen.
      */
     const val AUTHORITY_TOURISTS: String = "/api/v1/authority/tourists"
+
+    /** Live SOS incidents, newest and still-open first. Optional `?status=OPEN|ACKNOWLEDGED|ALL`. */
+    const val AUTHORITY_SOS: String = "/api/v1/authority/sos"
+
+    /** `POST` an acknowledgement (optional `note`) for one SOS. */
+    fun authoritySosAckPath(sosId: Long): String = "$AUTHORITY_SOS/$sosId/ack"
+
+    /**
+     * Trained-model forecasts, in their own feed.
+     *
+     * A separate endpoint from [AUTHORITY_SOS] on purpose: the server keeps a forecast structurally
+     * distinct from an incident, so the app cannot conflate them by accident.
+     */
+    const val AUTHORITY_RISK: String = "/api/v1/authority/risk"
+
+    /** The raw event feed, optionally filtered by `?kind=` and `?touristId=`. */
+    const val AUTHORITY_EVENTS: String = "/api/v1/authority/events"
 
     /**
      * The published restricted/dangerous/safe areas.
@@ -90,7 +109,31 @@ enum class AuthorityConnectionState {
  * scheme is assumed to be `http://` — a LAN backend has no certificate — and a trailing slash is
  * dropped so the path join cannot produce `//api/v1/...`, which Flask answers with a 404.
  */
+/**
+ * What an operator typed, checked before it is stored or dialled.
+ *
+ * A wrong address has to fail with something a person can act on, rather than as a socket error
+ * several layers down, and it must never be written to the store only to be discovered later.
+ */
+sealed interface AuthorityAddressInspection {
+
+    /** The address can be saved and called. [address] is the normalised form. */
+    data class Usable(val address: String) : AuthorityAddressInspection
+
+    /** The text cannot be an authority address. [message] says what to do instead. */
+    data class Rejected(val message: String) : AuthorityAddressInspection
+}
+
 object AuthorityUrls {
+
+    /** The sentence shown for an empty field, worded so it doubles as the example. */
+    const val BLANK_ADDRESS: String =
+        "Enter the authority address, for example 192.168.1.20:8080"
+
+    private const val MALFORMED_ADDRESS: String =
+        "\"%s\" is not an address this app can call. Use host:port, for example 192.168.1.20:8080"
+
+    private val SUPPORTED_SCHEMES = setOf("http", "https")
 
     fun normalise(baseUrl: String): String {
         val trimmed = baseUrl.trim()
@@ -104,6 +147,49 @@ object AuthorityUrls {
             "http://$trimmed"
         }
         return scheme.trimEnd('/')
+    }
+
+    /**
+     * Checks a typed address **without storing it**, so a settings screen can test exactly what is on
+     * screen and refuse a typo with a sentence instead of a stack of IO errors.
+     *
+     * Deliberately stricter than [normalise]. Normalising is a formatting job, and formatting nonsense
+     * is how `""`, `"http://"` or `"192.168.1.20:80:80"` reach the socket and fail there. The address
+     * becomes a live configuration value that the tourist session, the officer session, the outbox and
+     * zone sync all share, so it is worth one gate.
+     */
+    fun inspect(raw: String): AuthorityAddressInspection {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return AuthorityAddressInspection.Rejected(BLANK_ADDRESS)
+        if (trimmed.any { it.isWhitespace() }) {
+            return AuthorityAddressInspection.Rejected(
+                "An address cannot contain spaces. Use host:port, for example 192.168.1.20:8080",
+            )
+        }
+
+        val normalised = normalise(trimmed)
+        val parsed = try {
+            URI(normalised)
+        } catch (_: URISyntaxException) {
+            null
+        } ?: return AuthorityAddressInspection.Rejected(MALFORMED_ADDRESS.format(trimmed))
+
+        if (parsed.scheme?.lowercase() !in SUPPORTED_SCHEMES) {
+            return AuthorityAddressInspection.Rejected(
+                "Only http:// and https:// addresses are supported. Use host:port, for example " +
+                    "192.168.1.20:8080",
+            )
+        }
+        if (parsed.host.isNullOrBlank()) {
+            return AuthorityAddressInspection.Rejected(MALFORMED_ADDRESS.format(trimmed))
+        }
+        if (!parsed.path.isNullOrEmpty()) {
+            return AuthorityAddressInspection.Rejected(
+                "\"$trimmed\" has a path after the address. Give only the host and port, for example " +
+                    "192.168.1.20:8080",
+            )
+        }
+        return AuthorityAddressInspection.Usable(normalised)
     }
 
     fun resolve(baseUrl: String, path: String): String {
@@ -189,6 +275,124 @@ data class AuthorityTouristRow(
     val openSosCount: Int,
     val latestRiskBand: String?,
     val state: String,
+)
+
+/**
+ * One tourist as the **overview** reports them: where they are and whether anything is wrong.
+ *
+ * This is a different, shorter shape than [AuthorityTouristRow] because the server builds different
+ * queries for the two screens — the dashboard needs "is anyone in danger right now" for everyone at
+ * once, the register needs the account's whole registration history, one row at a time. A position is
+ * nullable for both, and for the same reason: a registered phone that has never reported is not at
+ * any particular place, and drawing it at (0, 0) would be an invention.
+ */
+data class AuthorityOverviewTourist(
+    val touristId: String,
+    val displayName: String,
+    val latitude: Double?,
+    val longitude: Double?,
+    val accuracyMeters: Double?,
+    val positionRecordedAtMillis: Long?,
+    val lastSeenMillis: Long?,
+    val lastEventAtMillis: Long?,
+    val openSosCount: Int,
+    val emergencyContactCount: Int,
+    val simulated: Boolean,
+    val state: String,
+    val latestRiskBand: String?,
+    val latestRiskProbability: Double?,
+    val latestRiskAtMillis: Long?,
+) {
+    val hasPosition: Boolean get() = latitude != null && longitude != null
+}
+
+/** The counters behind the dashboard's tiles, exactly as the server counts them. */
+data class AuthorityOverviewCounts(
+    val tourists: Int,
+    val events: Int,
+    val eventsLast24h: Int,
+    val sosTotal: Int,
+    val sosOpen: Int,
+    val sosAcknowledged: Int,
+    val zoneAlerts: Int,
+    val emergencyContacts: Int,
+    val riskAssessments: Int,
+    val riskElevated: Int,
+    val touristsWithElevatedRiskLast24h: Int,
+)
+
+/** `GET /authority/overview`: the tiles plus one row per tourist. */
+data class AuthorityOverview(
+    val counts: AuthorityOverviewCounts,
+    val tourists: List<AuthorityOverviewTourist>,
+    val serverTimeMillis: Long,
+)
+
+/**
+ * One SOS incident (`GET /authority/sos`).
+ *
+ * [status] is `OPEN` or `ACKNOWLEDGED` — the server's own vocabulary, carried through unchanged so
+ * the screen cannot invent a third state. Acknowledgement is recorded with who and when, which is
+ * what makes the two sightings of the same incident a record rather than a guess.
+ */
+data class AuthoritySosRow(
+    val sosId: Long,
+    val serverEventId: String?,
+    val touristId: String,
+    val displayName: String,
+    val latitude: Double?,
+    val longitude: Double?,
+    val accuracyMeters: Double?,
+    val raisedAtMillis: Long,
+    val receivedAtMillis: Long,
+    val status: String,
+    val simulated: Boolean,
+    val acknowledgedAtMillis: Long?,
+    val acknowledgedBy: String?,
+    val note: String?,
+) {
+    val isOpen: Boolean get() = status.equals("OPEN", ignoreCase = true)
+}
+
+/** One contributing factor behind a forecast, as the model reported it. */
+data class AuthorityRiskFactor(val label: String, val detail: String?)
+
+/**
+ * One trained-model forecast (`GET /authority/risk`).
+ *
+ * [probability] is nullable and [dataOk] is carried explicitly: a forecast the model could not make
+ * from enough samples must be shown as "not enough data", never as a low risk.
+ */
+data class AuthorityRiskRow(
+    val touristId: String,
+    val riskBand: String,
+    val probability: Double?,
+    val horizonSeconds: Double,
+    val modelVersion: String,
+    val observedSamples: Int,
+    val windowSamples: Int,
+    val dataOk: Boolean,
+    val dataReason: String?,
+    val factors: List<AuthorityRiskFactor>,
+    val assessedAtMillis: Long,
+    val receivedAtMillis: Long,
+    val disclaimer: String?,
+)
+
+/** One row of the raw event feed (`GET /authority/events`). */
+data class AuthorityEventRow(
+    val serverEventId: String?,
+    val touristId: String,
+    val kind: String,
+    val origin: String?,
+    val simulated: Boolean,
+    val latitude: Double?,
+    val longitude: Double?,
+    val zoneName: String?,
+    val zoneType: String?,
+    val eventType: String?,
+    val deviceTimestampMillis: Long?,
+    val receivedAtMillis: Long,
 )
 
 /**

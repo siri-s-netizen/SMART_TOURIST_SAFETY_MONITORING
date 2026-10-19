@@ -98,6 +98,23 @@ class AuthoritySessionStoreTest {
     }
 
     @Test
+    fun `a changed address survives a restart, so moving networks is a durable change`() {
+        runBlocking { store().setBaseUrl("192.168.1.20:8080") }
+
+        // The phone moves: a new network, a new address for the laptop.
+        val afterMove = restart()
+        runBlocking { afterMove.setBaseUrl("10.0.0.7:9090") }
+
+        val afterSecondRestart = restart()
+
+        assertEquals(
+            "the second address, not the first, must come back after a restart",
+            "http://10.0.0.7:9090",
+            runBlocking { afterSecondRestart.current().baseUrl },
+        )
+    }
+
+    @Test
     fun `seedBaseUrlIfUnset writes only when nothing has been configured`() {
         runBlocking {
             val store = store()

@@ -53,4 +53,20 @@ data class OutboxEventEntity(
 
     @ColumnInfo(name = "last_error")
     val lastError: String? = null,
+
+    /**
+     * The **stable subject id** of the tourist who raised this event — the id the authority minted for
+     * them at sign-in, and the same value the authority writes into `sessions.subject_id`.
+     *
+     * It is deliberately not the display name, the base URL, or "whoever is signed in when a retry
+     * happens to run". The authority files an upload against the token that carried it
+     * (`backend/tsm/api.py`: `tourist_id = _session["subject_id"]`), so the owner has to be recorded
+     * at *enqueue* time or the event can be attributed to the wrong person after an account switch.
+     *
+     * `null` means **unassigned**: a row queued before this column existed, or queued while nobody was
+     * signed in. Unassigned rows are preserved but are never uploaded automatically — see
+     * [com.touristsafety.app.data.repository.OutboxRepository.pendingForDelivery].
+     */
+    @ColumnInfo(name = "owner_subject_id")
+    val ownerSubjectId: String? = null,
 )

@@ -7,7 +7,9 @@ import com.touristsafety.app.domain.model.GeoPoint
 import com.touristsafety.app.domain.model.GeoReading
 import com.touristsafety.app.domain.model.LocationSource
 import com.touristsafety.app.domain.model.OutboxKind
+import com.touristsafety.app.testing.TEST_TOURIST_ID
 import com.touristsafety.app.testing.inMemoryDatabase
+import com.touristsafety.app.testing.ownedOutbox
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -34,7 +36,7 @@ class PositionReporterTest {
     @Before
     fun setUp() {
         database = inMemoryDatabase()
-        repository = OutboxRepository(database.outboxEventDao())
+        repository = ownedOutbox(database.outboxEventDao())
     }
 
     @After
@@ -69,6 +71,11 @@ class PositionReporterTest {
         assertEquals(1, pending.size)
         assertEquals(OutboxKind.POSITION, pending.single().kind)
         assertEquals("position:5000", pending.single().dedupeKey)
+        assertEquals(
+            "a position report must belong to the tourist who sent it",
+            TEST_TOURIST_ID,
+            pending.single().ownerSubjectId,
+        )
     }
 
     @Test

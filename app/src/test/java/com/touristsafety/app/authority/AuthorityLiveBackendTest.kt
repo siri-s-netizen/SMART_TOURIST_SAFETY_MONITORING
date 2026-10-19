@@ -3,6 +3,7 @@ package com.touristsafety.app.authority
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.touristsafety.app.data.database.AppDatabase
 import com.touristsafety.app.data.repository.OutboxRepository
+import com.touristsafety.app.domain.model.GeoPoint
 import com.touristsafety.app.domain.model.OutboxEvent
 import com.touristsafety.app.domain.model.OutboxKind
 import com.touristsafety.app.domain.model.OutboxOrigin
@@ -10,6 +11,7 @@ import com.touristsafety.app.domain.model.OutboxStatus
 import com.touristsafety.app.outbox.OutboxSyncer
 import com.touristsafety.app.outbox.OutboxPayloads
 import com.touristsafety.app.testing.inMemoryDatabase
+import com.touristsafety.app.testing.ownedOutbox
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,7 +68,7 @@ class AuthorityLiveBackendTest {
     @Before
     fun setUp() {
         database = inMemoryDatabase()
-        outbox = OutboxRepository(database.outboxEventDao())
+        outbox = ownedOutbox(database.outboxEventDao())
     }
 
     @After
@@ -678,4 +680,172 @@ class AuthorityLiveBackendTest {
         assertEquals(403, (refused as AuthorityCall.HttpError).status)
         println("[e2e] a tourist token was refused the officer register with HTTP 403")
     }
+
+    /**
+     * Shared zone management, end to end over a real socket.
+     *
+     * A zone drawn by an officer is only "shared" if some *other* session can read it back. This test
+     * therefore never inspects the server's database, and never reads the zone through the officer's own
+     * token: it publishes as the authority and reads as the **tourist**, on the exact route
+     * (`GET /zones`) the tourist app's sync uses.
+     *
+     * Each step checks the field a phone depends on, not merely that a call succeeded:
+     *
+     * - after `POST`, the tourist's feed contains the new zone with the polygon that was drawn;
+     * - after `PUT`, the revision has *increased*, so a phone holding the old polygon can tell it is
+     *   stale, and the tourist's feed carries the new geometry;
+     * - after `DELETE`, the zone is **gone** from the tourist's feed, so a withdrawn boundary stops
+     *   warning people, while the route still answers;
+     * - and a tourist token is refused the write route, so "the authority publishes zones" is not
+     *   something a tourist can do.
+     */
+    @Test
+    fun `a zone the officer publishes reaches the tourist feed and archiving withdraws it`() =
+        runBlocking {
+            assumeTrue("Set -Dtsm.e2e.baseUrl=http://host:port to run the live test", baseUrl.isNotEmpty())
+            val accounts = credentials()
+            val officer = accounts["authority"]
+            val tourist = accounts["tourist"]
+            assertTrue("the credentials file has no authority account", officer != null)
+            assertTrue("the credentials file has no tourist account", tourist != null)
+
+            val client = client()
+
+            val officerLogin =
+                client.login(AuthorityRoles.AUTHORITY, officer!!.first, officer.second, "e2e-zones")
+            assertTrue("authority login failed: $officerLogin", officerLogin is AuthorityCall.Ok)
+            val officerToken = (officerLogin as AuthorityCall.Ok).value.token
+
+            val touristLogin =
+                client.login(AuthorityRoles.TOURIST, tourist!!.first, tourist.second, "e2e-zones-tourist")
+            assertTrue("tourist login failed: $touristLogin", touristLogin is AuthorityCall.Ok)
+            val touristToken = (touristLogin as AuthorityCall.Ok).value.token
+
+            // A unique name, so a zone left behind by an interrupted earlier run cannot be mistaken for
+            // the one this test published.
+            val name = "e2e shared zone ${System.currentTimeMillis()}"
+            val drawn = listOf(
+                GeoPoint(12.9716, 77.5946),
+                GeoPoint(12.9734, 77.5946),
+                GeoPoint(12.9734, 77.5974),
+                GeoPoint(12.9716, 77.5974),
+            )
+            val moved = listOf(
+                GeoPoint(12.9800, 77.6000),
+                GeoPoint(12.9818, 77.6000),
+                GeoPoint(12.9818, 77.6030),
+                GeoPoint(12.9800, 77.6030),
+            )
+
+            var created: AuthorityZone? = null
+            try {
+                // ---- the officer publishes it -----------------------------------------------------
+                val createdCall = client.createZone(
+                    officerToken,
+                    name,
+                    "Published by the live test; archived again at the end.",
+                    ZoneType.RESTRICTED,
+                    drawn,
+                    ZoneStatus.ACTIVE,
+                )
+                assertTrue("creating the zone failed: $createdCall", createdCall is AuthorityCall.Ok)
+                val zone = (createdCall as AuthorityCall.Ok).value
+                created = zone
+                assertEquals(name, zone.name)
+                assertEquals(ZoneType.RESTRICTED, zone.zoneType)
+                assertTrue("a newly created zone is published", zone.isActive)
+                assertEquals(1, zone.revision)
+                assertEquals("the ring must survive the round trip", drawn, zone.vertices)
+                println("[e2e] officer published zone ${zone.zoneId} as revision ${zone.revision}")
+
+                // ---- a *tourist* session can read it back ----------------------------------------
+                val touristFeed = client.activeZones(touristToken)
+                assertTrue("the tourist's zone feed failed: $touristFeed", touristFeed is AuthorityCall.Ok)
+                val published = (touristFeed as AuthorityCall.Ok).value
+                val seen = published.firstOrNull { it.zoneId == zone.zoneId }
+                assertTrue(
+                    "a zone the officer published must appear on the tourist's feed; it saw " +
+                        "${published.map { it.zoneId }}",
+                    seen != null,
+                )
+                assertEquals("the tourist must be warned about the same polygon", drawn, seen!!.vertices)
+                assertEquals(ZoneType.RESTRICTED, seen.zoneType)
+
+                // ---- moving it must be visible as a *new revision* -------------------------------
+                val movedCall = client.updateZone(
+                    officerToken,
+                    zone.zoneId,
+                    name,
+                    "Moved by the live test.",
+                    ZoneType.DANGEROUS,
+                    moved,
+                    ZoneStatus.ACTIVE,
+                )
+                assertTrue("updating the zone failed: $movedCall", movedCall is AuthorityCall.Ok)
+                val updated = (movedCall as AuthorityCall.Ok).value
+                assertTrue(
+                    "an edit must advance the revision, or a phone holding the old polygon cannot tell " +
+                        "that it is stale: revision stayed at ${updated.revision}",
+                    updated.revision > zone.revision,
+                )
+                assertEquals("the edit must be applied", moved, updated.vertices)
+                assertEquals(ZoneType.DANGEROUS, updated.zoneType)
+
+                val afterMove = client.activeZones(touristToken)
+                assertTrue(afterMove is AuthorityCall.Ok)
+                val reread = (afterMove as AuthorityCall.Ok).value.firstOrNull { it.zoneId == zone.zoneId }
+                assertTrue("the zone must still be published after the edit", reread != null)
+                assertEquals("the tourist must see the new revision", updated.revision, reread!!.revision)
+                assertEquals("and the new geometry", moved, reread.vertices)
+                println("[e2e] the tourist feed now shows revision ${reread.revision} at the new polygon")
+
+                // ---- a tourist cannot publish ----------------------------------------------------
+                val touristWrite = client.createZone(
+                    touristToken,
+                    "not allowed",
+                    "",
+                    ZoneType.SAFE,
+                    drawn,
+                    ZoneStatus.ACTIVE,
+                )
+                assertTrue(
+                    "a tourist token must not be able to publish a zone, was $touristWrite",
+                    touristWrite is AuthorityCall.HttpError,
+                )
+                println(
+                    "[e2e] a tourist token was refused the zone write route with " +
+                        "HTTP ${(touristWrite as AuthorityCall.HttpError).status}",
+                )
+
+                // ---- archiving withdraws it from the feed, and the record stays ------------------
+                val archivedCall = client.archiveZone(officerToken, zone.zoneId)
+                assertTrue("archiving the zone failed: $archivedCall", archivedCall is AuthorityCall.Ok)
+                val archived = (archivedCall as AuthorityCall.Ok).value
+                assertEquals("archived, not deleted", ZoneStatus.ARCHIVED, archived.status)
+                assertTrue("and it is no longer published", !archived.isActive)
+
+                val afterArchive = client.activeZones(touristToken)
+                assertTrue("the tourist's zone feed failed: $afterArchive", afterArchive is AuthorityCall.Ok)
+                assertTrue(
+                    "a withdrawn boundary must disappear from the tourist's feed, so it stops warning " +
+                        "people; the feed still held zone ${zone.zoneId}",
+                    (afterArchive as AuthorityCall.Ok).value.none { it.zoneId == zone.zoneId },
+                )
+                val stillThere = client.authorityZones(officerToken)
+                assertTrue(stillThere is AuthorityCall.Ok)
+                assertTrue(
+                    "the record itself must be kept, just unpublished",
+                    (stillThere as AuthorityCall.Ok).value.any { it.zoneId == zone.zoneId },
+                )
+                println("[e2e] archived zone ${zone.zoneId}: withdrawn from the tourist feed, record kept")
+            } finally {
+                // Leave no published test zone behind if an assertion failed part-way through.
+                created?.let { zone ->
+                    val cleanup = client.archiveZone(officerToken, zone.zoneId)
+                    if (cleanup !is AuthorityCall.Ok) {
+                        println("[e2e] WARNING: could not archive test zone ${zone.zoneId}: $cleanup")
+                    }
+                }
+            }
+        }
 }

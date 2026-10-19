@@ -20,6 +20,11 @@ import com.touristsafety.app.outbox.OutboxPayloads
  * Nothing is uploaded while the risk is LOW and always has been, and nothing is uploaded for an
  * UNAVAILABLE prediction - "we could not tell" is not a prediction, and storing it as one would let
  * the dashboard imply the model made a call it did not make.
+ *
+ * Nothing is uploaded for a prediction made by a watch that has since **stopped**, either. Switching
+ * the watch off (or signing out) freezes the last band where it was; that frozen value is a reading
+ * about the past, not a forecast about now, and a "cleared" record sent because a sensor was switched
+ * off would tell the authority a tourist is fine for a reason the model never gave.
  */
 data class FutureRiskReportPolicy(
     /** Minimum gap between two routine refreshes of an unchanged band. */
@@ -37,6 +42,14 @@ data class FutureRiskReportPolicy(
         NOTHING_TO_CLEAR,
         WITHIN_INTERVAL,
         STALE,
+
+        /**
+         * The watch is not running, so the last band is a frozen reading rather than a prediction
+         * about now. Reporting it would tell the authority something the model has stopped saying —
+         * and if the frozen band were LOW it would send a "cleared" record for a watch that was
+         * merely switched off, which is worse than saying nothing.
+         */
+        NOT_MONITORING,
     }
 
     data class Decision(val send: Boolean, val reason: Reason)
@@ -53,6 +66,9 @@ data class FutureRiskReportPolicy(
         lastReportedBand: FutureRiskBand?,
         lastReportedAtMillis: Long?,
     ): Decision {
+        // Checked before anything else: with the watch stopped there is no live prediction to judge,
+        // so none of the rules below (including "cleared") may fire.
+        if (!state.isMonitoring) return Decision(false, Reason.NOT_MONITORING)
         if (!state.hasPrediction) return Decision(false, Reason.NO_PREDICTION)
         // A frozen band from a sensor stream that stopped is not news about the tourist.
         if (state.isStale(nowMillis)) return Decision(false, Reason.STALE)

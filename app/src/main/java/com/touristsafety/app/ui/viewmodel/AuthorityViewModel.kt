@@ -2,6 +2,7 @@ package com.touristsafety.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.touristsafety.app.authority.AuthorityAddressInspection
 import com.touristsafety.app.authority.AuthorityCall
 import com.touristsafety.app.authority.AuthorityClient
 import com.touristsafety.app.authority.AuthorityConnectionState
@@ -10,8 +11,10 @@ import com.touristsafety.app.authority.AuthorityRegistration
 import com.touristsafety.app.authority.AuthorityRoles
 import com.touristsafety.app.authority.AuthoritySession
 import com.touristsafety.app.authority.AuthoritySessionStore
+import com.touristsafety.app.authority.AuthorityUrls
 import com.touristsafety.app.authority.RegistrationForm
 import com.touristsafety.app.authority.RegistrationValidation
+import com.touristsafety.app.authority.sessionWrite
 import com.touristsafety.app.data.repository.OutboxRepository
 import com.touristsafety.app.domain.model.EmergencyContact
 import com.touristsafety.app.outbox.OutboxSyncer
@@ -75,15 +78,35 @@ class AuthorityViewModel(
      */
     val connection: StateFlow<AuthorityConnectionState> = _connection.asStateFlow()
 
+    /**
+     * Stores the authority address, refusing text that cannot be one.
+     *
+     * This single value is what the tourist sign-in, the officer sign-in, the upload queue, SOS
+     * delivery and zone sync all dial, so it is validated here rather than trusted and discovered to
+     * be wrong at the socket. A rejected address leaves whatever was already stored untouched.
+     */
     fun setAddress(address: String) {
         viewModelScope.launch {
-            sessions.setBaseUrl(address)
-            val saved = sessions.current().baseUrl
-            _connection.value = AuthorityConnectionState.UNKNOWN
-            _message.value = if (saved.isBlank()) {
-                "Enter the authority address, for example 192.168.1.20:8080"
-            } else {
-                "Authority address set to $saved"
+            when (val inspection = AuthorityUrls.inspect(address)) {
+                is AuthorityAddressInspection.Rejected -> {
+                    _message.value = inspection.message
+                }
+
+                is AuthorityAddressInspection.Usable -> {
+                    val failure = sessionWrite("Could not save the address") {
+                        sessions.setBaseUrl(inspection.address)
+                    }
+                    if (failure != null) {
+                        // Nothing was written, so the address already in force is unchanged. Say that
+                        // rather than claiming a change that did not happen.
+                        _message.value = "$failure The address already in use is unchanged."
+                        return@launch
+                    }
+                    val saved = sessions.current().baseUrl
+                    _connection.value = AuthorityConnectionState.UNKNOWN
+                    _message.value = "Authority address set to $saved. Tourist sign-in, officer " +
+                        "sign-in, the upload queue and zone sync all now use this address."
+                }
             }
         }
     }
@@ -119,8 +142,11 @@ class AuthorityViewModel(
             }
             _message.value = when (call) {
                 is AuthorityCall.Ok -> {
-                    sessions.saveLogin(address, call.value)
-                    "Signed in as ${call.value.displayName} (${call.value.subjectId})."
+                    // The token is only real once it is stored: if this write fails the phone is not
+                    // signed in, and saying "signed in" would be a lie the next screen would contradict.
+                    sessionWrite("Signed in, but this phone could not store the session") {
+                        sessions.saveLogin(address, call.value)
+                    } ?: "Signed in as ${call.value.displayName} (${call.value.subjectId})."
                 }
 
                 is AuthorityCall.HttpError -> "Sign-in failed (HTTP ${call.status}): ${call.message}"
@@ -225,14 +251,19 @@ class AuthorityViewModel(
         viewModelScope.launch {
             _busy.value = true
             val token = sessions.current().token
+            // Best effort: a token that cannot be revoked server-side is still discarded locally.
             if (!token.isNullOrBlank()) {
-                // Best effort: a token that cannot be revoked server-side is still discarded locally.
                 client.logout(token)
             }
-            sessions.clearLogin()
-            _profile.value = null
+            val failure = sessionWrite("Could not clear this phone's session") {
+                sessions.clearLogin()
+            }
+            if (failure == null) {
+                _profile.value = null
+            }
             _busy.value = false
-            _message.value = "Signed out. Nothing is lost: queued events stay on this phone."
+            _message.value = failure
+                ?: "Signed out. Nothing is lost: queued events stay on this phone."
         }
     }
 
@@ -260,28 +291,62 @@ class AuthorityViewModel(
         }
     }
 
-    /** Proves reachability without touching the queue, so "is the server there?" has a clean answer. */
-    fun testConnection() {        viewModelScope.launch {
-            val address = sessions.current().baseUrl
-            if (address.isBlank()) {
-                _connection.value = AuthorityConnectionState.NOT_CONFIGURED
-                _message.value = "Set the authority address first."
-                return@launch
+    /**
+     * Proves reachability without touching the queue, so "is the server there?" has a clean answer.
+     *
+     * [address] is the text currently in the settings field, and it is what gets dialled — *not* the
+     * stored address. This is deliberate and it is the fix for the failure that started all this:
+     * testing the stored address made the screen report on a host the operator had not typed, so a
+     * correct new address looked rejected and an old one looked like the app was ignoring the field.
+     *
+     * Because this may be an address that has not been saved yet, the connection indicator (which
+     * describes the *stored* address, and is what the sign-in screens act on) is only updated when the
+     * tested text is in fact the stored one. Any other outcome is said plainly in the message.
+     */
+    fun testConnection(address: String) {
+        viewModelScope.launch {
+            val typed = when (val inspection = AuthorityUrls.inspect(address)) {
+                is AuthorityAddressInspection.Rejected -> {
+                    _message.value = inspection.message
+                    return@launch
+                }
+
+                is AuthorityAddressInspection.Usable -> inspection.address
             }
+
+            // Compared normalised, because the stored value and the typed value are written in
+            // different ways ("10.0.0.5:8080" and "http://10.0.0.5:8080" are the same authority).
+            val stored = AuthorityUrls.normalise(sessions.current().baseUrl)
+            val isStored = typed == stored
+
             _busy.value = true
-            _connection.value = AuthorityConnectionState.CHECKING
-            val call = client.health()
-            _connection.value = when (call) {
-                is AuthorityCall.Ok -> AuthorityConnectionState.CONNECTED
-                is AuthorityCall.HttpError -> AuthorityConnectionState.ERROR
-                is AuthorityCall.Unreachable -> AuthorityConnectionState.OFFLINE
-                is AuthorityCall.Protocol -> AuthorityConnectionState.ERROR
+            if (isStored) {
+                _connection.value = AuthorityConnectionState.CHECKING
             }
-            _message.value = when (call) {
-                is AuthorityCall.Ok -> "The authority at $address answered /api/v1/health."
-                is AuthorityCall.HttpError -> "Reached $address but it answered HTTP ${call.status}: ${call.message}"
-                is AuthorityCall.Unreachable -> "Cannot reach $address: ${call.message}"
+            val call = client.health(baseUrlOverride = typed)
+            if (isStored) {
+                _connection.value = when (call) {
+                    is AuthorityCall.Ok -> AuthorityConnectionState.CONNECTED
+                    is AuthorityCall.HttpError -> AuthorityConnectionState.ERROR
+                    is AuthorityCall.Unreachable -> AuthorityConnectionState.OFFLINE
+                    is AuthorityCall.Protocol -> AuthorityConnectionState.ERROR
+                }
+            }
+            val outcome = when (call) {
+                is AuthorityCall.Ok -> "The authority at $typed answered /api/v1/health."
+                is AuthorityCall.HttpError ->
+                    "Reached $typed but it answered HTTP ${call.status}: ${call.message}"
+
+                is AuthorityCall.Unreachable -> "Cannot reach $typed: ${call.message}"
                 is AuthorityCall.Protocol -> call.message
+            }
+            _message.value = if (isStored || call !is AuthorityCall.Ok) {
+                outcome
+            } else {
+                // Reachable, but this is not the address the app is currently using: say so, or the
+                // green result would be mistaken for a change that has already taken effect.
+                "$outcome Tap Save address to use it, or the app will keep dialling " +
+                    (stored.ifBlank { "nothing" }) + "."
             }
             _busy.value = false
         }
@@ -307,9 +372,17 @@ class AuthorityViewModel(
                     // screen shows the sign-in form again, instead of a "signed in" state that can
                     // never actually sync. The queued events are untouched and go out after re-sign-in.
                     if (call.status == 401 || call.status == 403) {
-                        sessions.clearLogin()
-                        _profile.value = null
-                        _message.value = "Your sign-in expired. Sign in again to resume uploading."
+                        // If the token cannot be dropped the screen stays signed in, so say that rather
+                        // than asking for a sign-in that would change nothing.
+                        val failure = sessionWrite(
+                            "Your sign-in expired, but this phone could not clear the old session",
+                        ) { sessions.clearLogin() }
+                        if (failure == null) {
+                            _profile.value = null
+                            _message.value = "Your sign-in expired. Sign in again to resume uploading."
+                        } else {
+                            _message.value = failure
+                        }
                     } else {
                         _message.value =
                             "Could not read your record (HTTP ${call.status}): ${call.message}"

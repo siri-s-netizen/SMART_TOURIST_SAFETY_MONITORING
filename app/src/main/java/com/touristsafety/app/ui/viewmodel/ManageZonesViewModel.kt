@@ -8,6 +8,7 @@ import com.touristsafety.app.data.repository.SaveZoneResult
 import com.touristsafety.app.domain.model.GeoFenceZone
 import com.touristsafety.app.domain.model.GeoPoint
 import com.touristsafety.app.domain.model.ZoneType
+import com.touristsafety.app.domain.model.ZoneSource
 import com.touristsafety.app.geofencing.SampleAreas
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -102,10 +103,17 @@ class ManageZonesViewModel(
 
     fun deleteAll() {
         viewModelScope.launch {
-            val count = zones.value.size
-            runCatching { geoFenceRepository.deleteAll() }
+            // Only the zones drawn on this phone. The authority's published zones are a mirror that
+            // would be restored by the next sync, so offering to delete them would be a button that
+            // cannot do what it says.
+            val localCount = zones.value.count { it.source == ZoneSource.LOCAL }
+            val deleted = runCatching { geoFenceRepository.deleteLocalZones() }.getOrDefault(0)
             _typeFilter.value = null
-            _message.value = "$count zone(s) deleted. Alert history was kept."
+            _message.value = when {
+                localCount == 0 -> "You have not drawn any zones on this phone; the authority's are kept."
+                deleted == localCount -> "$deleted zone(s) deleted. Alert history was kept."
+                else -> "$deleted of $localCount zone(s) deleted. Alert history was kept."
+            }
         }
     }
 
